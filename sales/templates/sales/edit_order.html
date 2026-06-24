@@ -12,13 +12,19 @@
     <p>مشتری: {{ order.customer.name|default:"عمومی" }}</p>
     <p>مبلغ فعلی: {{ order.grand_total|intcomma }} تومان</p>
 
-    <form method="post">
+    <form method="post" id="edit-order-form">
         {% csrf_token %}
 
         <h4 class="mt-4">اقلام فعلی (برگشت جزئی)</h4>
         <table class="table table-bordered">
             <thead class="table-light">
-                <tr><th>کالا</th><th>تعداد فروخته</th><th>قبلاً برگشت</th><th>قابل برگشت</th><th>تعداد برگشتی</th></tr>
+                <tr>
+                    <th>کالا</th>
+                    <th>تعداد فروخته</th>
+                    <th>قبلاً برگشت</th>
+                    <th>قابل برگشت</th>
+                    <th>تعداد برگشتی</th>
+                </tr>
             </thead>
             <tbody>
                 {% for item in order_items %}
@@ -28,8 +34,10 @@
                     <td>{{ item.returned_quantity|format_quantity }}</td>
                     <td>{{ item.available_qty|format_quantity }}</td>
                     <td>
-                        <input type="number" name="return_quantities[]" min="0" max="{{ item.available_qty }}"
-                               value="0" step="any" class="form-control" style="max-width:120px;">
+                        <input type="number" name="return_quantities[]" 
+                               min="0" max="{{ item.available_qty }}"
+                               value="0" step="any" class="form-control" 
+                               style="max-width:120px;">
                         <input type="hidden" name="return_item_ids[]" value="{{ item.id }}">
                     </td>
                 </tr>
@@ -38,27 +46,32 @@
         </table>
 
         <h4 class="mt-4">افزودن کالای جدید</h4>
-        <div id="new-items">
-            <div class="row g-2 mb-2 new-item-row">
-                <div class="col-md-6">
-                    <input type="text" class="form-control product-search" placeholder="جستجوی کالا..." oninput="filterProducts(this)">
-                    <select name="new_product_ids[]" class="form-select product-select mt-1">
-                        <option value="">-- انتخاب کالا --</option>
-                        {% for product in products %}
-                            <option value="{{ product.id }}" data-name="{{ product.name|lower }}" data-barcode="{{ product.barcode|lower }}">{{ product }} (موجودی: {{ product.stock_quantity|format_quantity }})</option>
-                        {% endfor %}
-                    </select>
-                </div>
-                <div class="col-md-4">
-                    <input type="number" name="new_quantities[]" min="0.001" value="1" step="any"
-                           class="form-control" placeholder="تعداد">
-                </div>
-                <div class="col-md-2">
-                    <button type="button" class="btn btn-danger" onclick="this.closest('.new-item-row').remove()">حذف</button>
-                </div>
-            </div>
+        
+        <!-- جستجوی کالا (مشابه صندوق فروش) -->
+        <div class="input-group mb-3">
+            <input type="text" id="product-search" class="form-control" 
+                   placeholder="جستجوی نام یا بارکد کالا..." autocomplete="off">
+            <button class="btn btn-outline-secondary" type="button" 
+                    onclick="searchProduct()">🔍</button>
         </div>
-        <button type="button" class="btn btn-secondary mb-3" onclick="addNewItemRow()">➕ افزودن کالای دیگر</button>
+        <ul id="search-results" class="list-group position-relative mb-3" 
+            style="z-index:1000; max-height:200px; overflow-y:auto; display:none;"></ul>
+
+        <!-- جدول کالاهای جدید اضافه‌شده -->
+        <div class="table-responsive">
+            <table class="table table-bordered" id="new-items-table">
+                <thead class="table-light">
+                    <tr>
+                        <th>کالا</th>
+                        <th>تعداد</th>
+                        <th>جمع (تومان)</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody></tbody>
+            </table>
+        </div>
+        <p class="text-muted" id="no-items-msg">هیچ کالایی اضافه نشده است.</p>
 
         <div class="mb-3">
             <label class="form-label">روش تسویه مابه‌التفاوت</label>
@@ -70,41 +83,132 @@
         </div>
 
         <hr>
-        <button type="submit" class="btn btn-primary">ثبت اصلاحیه</button>
-        <a href="{% url 'management:order_detail' order.id %}" class="btn btn-secondary">بازگشت</a>
+        <div class="d-flex gap-2">
+            <button type="button" id="submit-edit-btn" class="btn btn-primary">ثبت اصلاحیه</button>
+            <a href="{% url 'management:order_detail' order.id %}" class="btn btn-secondary">بازگشت</a>
+        </div>
     </form>
 </div>
+{% endblock %}
 
+{% block extra_js %}
 <script>
-function addNewItemRow() {
-    const container = document.getElementById('new-items');
-    const row = document.querySelector('.new-item-row').cloneNode(true);
-    row.querySelector('select').value = '';
-    row.querySelector('input[type="number"]').value = 1;
-    row.querySelector('.product-search').value = '';
-    container.appendChild(row);
-}
+    // آرایهٔ موقت برای کالاهای جدید
+    const newItems = [];   // هر عضو: { product_id, product_name, quantity }
 
-function filterProducts(input) {
-    const searchTerm = input.value.toLowerCase();
-    const select = input.nextElementSibling;
-    const options = select.querySelectorAll('option');
+    // ===================== جستجوی محصولات =====================
+    function searchProduct() {
+        const q = document.getElementById('product-search').value.trim();
+        if (q.length < 2) return;
 
-    options.forEach(option => {
-        if (option.value === '') {
-            option.style.display = '';
+        fetch('/sales/search-products-purchase/?q=' + encodeURIComponent(q))
+            .then(r => r.json())
+            .then(data => {
+                const ul = document.getElementById('search-results');
+                ul.innerHTML = '';
+                if (data.length === 0) {
+                    ul.innerHTML = '<li class="list-group-item text-muted">نتیجه‌ای یافت نشد</li>';
+                } else {
+                    data.forEach(p => {
+                        const li = document.createElement('li');
+                        li.className = 'list-group-item list-group-item-action';
+                        li.style.cursor = 'pointer';
+                        li.innerHTML = `${p.name} (بارکد: ${p.barcode}) - موجودی: ${p.stock}`;
+                        li.addEventListener('click', () => addNewProduct(p));
+                        ul.appendChild(li);
+                    });
+                }
+                ul.style.display = 'block';
+            });
+    }
+
+    // ===================== افزودن کالا به جدول =====================
+    function addNewProduct(product) {
+        // بررسی تکراری نبودن
+        if (newItems.find(item => item.product_id === product.id)) {
+            alert('این کالا قبلاً اضافه شده است.');
             return;
         }
-        const name = option.getAttribute('data-name') || '';
-        const barcode = option.getAttribute('data-barcode') || '';
-        const text = option.text.toLowerCase();
+        newItems.push({
+            product_id: product.id,
+            product_name: product.name,
+            quantity: 1
+        });
+        renderNewItemsTable();
+        document.getElementById('search-results').style.display = 'none';
+        document.getElementById('product-search').value = '';
+        document.getElementById('no-items-msg').style.display = 'none';
+    }
 
-        if (name.includes(searchTerm) || barcode.includes(searchTerm) || text.includes(searchTerm)) {
-            option.style.display = '';
-        } else {
-            option.style.display = 'none';
+    function removeNewItem(index) {
+        newItems.splice(index, 1);
+        renderNewItemsTable();
+        if (newItems.length === 0) {
+            document.getElementById('no-items-msg').style.display = 'block';
         }
+    }
+
+    function updateNewItemQuantity(index, newQty) {
+        newItems[index].quantity = parseFloat(newQty) || 1;
+        renderNewItemsTable();
+    }
+
+    function renderNewItemsTable() {
+        const tbody = document.querySelector('#new-items-table tbody');
+        tbody.innerHTML = '';
+        newItems.forEach((item, idx) => {
+            tbody.innerHTML += `
+                <tr>
+                    <td>
+                        ${item.product_name}
+                        <input type="hidden" name="new_product_ids[]" value="${item.product_id}">
+                    </td>
+                    <td>
+                        <input type="number" name="new_quantities[]" 
+                               value="${item.quantity}" min="0.001" step="any"
+                               class="form-control form-control-sm" style="width:100px;"
+                               onchange="updateNewItemQuantity(${idx}, this.value)">
+                    </td>
+                    <td>---</td>
+                    <td>
+                        <button type="button" class="btn btn-danger btn-sm" 
+                                onclick="removeNewItem(${idx})">🗑️</button>
+                    </td>
+                </tr>
+            `;
+        });
+    }
+
+    // ===================== مدیریت رویدادها =====================
+    document.addEventListener('DOMContentLoaded', function() {
+        // 1. دکمه ثبت اصلاحیه
+        const submitBtn = document.getElementById('submit-edit-btn');
+        const form = document.getElementById('edit-order-form');
+        if (submitBtn && form) {
+            submitBtn.addEventListener('click', function() {
+                form.submit();
+            });
+        }
+
+        // 2. جستجو با Enter در فیلد product-search
+        const searchInput = document.getElementById('product-search');
+        if (searchInput) {
+            searchInput.addEventListener('keydown', function(e) {
+                if (e.key === 'Enter') {
+                    e.preventDefault();      // جلوگیری از submit فرم
+                    searchProduct();
+                }
+            });
+        }
+
+        // 3. بستن نتایج با کلیک بیرون
+        document.addEventListener('click', function(e) {
+            const searchInput = document.getElementById('product-search');
+            const searchResults = document.getElementById('search-results');
+            if (!searchInput.contains(e.target) && !searchResults.contains(e.target)) {
+                searchResults.style.display = 'none';
+            }
+        });
     });
-}
 </script>
 {% endblock %}

@@ -47,7 +47,6 @@ def recalc_cart(request):
     cart = request.session.get('cart', [])
     discount = request.session.get('discount', {'type': 'none', 'value': 0})
 
-    # BUG FIX: بارگذاری همه محصولات یکجا به جای query در هر iteration
     product_ids = [item['product_id'] for item in cart]
     products_map = {p.pk: p for p in Product.objects.filter(pk__in=product_ids)}
 
@@ -296,7 +295,6 @@ def checkout(request):
     customer_id = data.get('customer_id')
     discount = request.session.get('discount', {'type': 'none', 'value': 0})
 
-    # BUG FIX: بررسی موجودی قبل از هر اقدامی
     product_ids = [item['product_id'] for item in cart]
     products_map = {p.pk: p for p in Product.objects.select_for_update().filter(pk__in=product_ids)}
 
@@ -382,12 +380,10 @@ def checkout(request):
                 amount=line['amount']
             )
 
-        # BUG FIX: تغییر موجودی و inventory_cost به صورت صریح
         product.inventory_cost -= avg_cost * qty
         product.stock_quantity -= qty
         product.save()
 
-        # ثبت گردش انبار بدون اعمال مجدد تغییر موجودی
         StockMovement.objects.create(
             product=product,
             quantity=qty,
@@ -490,13 +486,11 @@ def purchase_create(request):
             )
             total += price * qty
 
-            # BUG FIX: اعمال صریح تغییرات موجودی و ارزش انبار
             product.inventory_cost += qty * price
             product.stock_quantity += qty
             product.purchase_price = price
             product.save()
 
-            # ثبت گردش انبار بدون اعمال مجدد تغییر موجودی
             StockMovement.objects.create(
                 product=product,
                 quantity=qty,
@@ -543,7 +537,10 @@ def dashboard(request):
         order__is_paid=True,
         order__is_return=False
     ).aggregate(
-        total=Sum(F('purchase_cost') * F('quantity'), output_field=DecimalField(max_digits=14, decimal_places=0))
+        total=Sum(
+            F('purchase_cost') * (F('quantity') - F('returned_quantity')),
+            output_field=DecimalField(max_digits=14, decimal_places=0)
+        )
     )['total'] or Decimal('0')
 
     cost_return = OrderItem.objects.filter(
@@ -551,7 +548,10 @@ def dashboard(request):
         order__is_paid=True,
         order__is_return=True
     ).aggregate(
-        total=Sum(F('purchase_cost') * F('quantity'), output_field=DecimalField(max_digits=14, decimal_places=0))
+        total=Sum(
+            F('purchase_cost') * (F('quantity') - F('returned_quantity')),
+            output_field=DecimalField(max_digits=14, decimal_places=0)
+        )
     )['total'] or Decimal('0')
 
     net_cost = cost_normal - cost_return
@@ -637,7 +637,10 @@ def daily_report(request):
         order__is_paid=True,
         order__is_return=False
     ).aggregate(
-        total=Sum(F('purchase_cost') * F('quantity'), output_field=DecimalField(max_digits=14, decimal_places=0))
+        total=Sum(
+            F('purchase_cost') * (F('quantity') - F('returned_quantity')),
+            output_field=DecimalField(max_digits=14, decimal_places=0)
+        )
     )['total'] or Decimal('0')
 
     cost_return = OrderItem.objects.filter(
@@ -646,7 +649,10 @@ def daily_report(request):
         order__is_paid=True,
         order__is_return=True
     ).aggregate(
-        total=Sum(F('purchase_cost') * F('quantity'), output_field=DecimalField(max_digits=14, decimal_places=0))
+        total=Sum(
+            F('purchase_cost') * (F('quantity') - F('returned_quantity')),
+            output_field=DecimalField(max_digits=14, decimal_places=0)
+        )
     )['total'] or Decimal('0')
 
     total_cost = cost_normal - cost_return
@@ -668,6 +674,9 @@ def daily_report(request):
 
     product_sales = {}
     for item in normal_items:
+        net_qty = item.quantity - item.returned_quantity
+        if net_qty <= 0:
+            continue
         prod_id = item.product_id
         if prod_id not in product_sales:
             product_sales[prod_id] = {
@@ -676,11 +685,15 @@ def daily_report(request):
                 'total_sales': Decimal('0'),
                 'total_cost': Decimal('0'),
             }
-        product_sales[prod_id]['quantity'] += item.quantity
-        product_sales[prod_id]['total_sales'] += item.unit_price * item.quantity + item.tax_amount
-        product_sales[prod_id]['total_cost'] += item.purchase_cost * item.quantity
+        product_sales[prod_id]['quantity'] += net_qty
+        tax_share = item.tax_amount * (net_qty / item.quantity) if item.quantity else Decimal('0')
+        product_sales[prod_id]['total_sales'] += item.unit_price * net_qty + tax_share
+        product_sales[prod_id]['total_cost'] += item.purchase_cost * net_qty
 
     for item in return_items:
+        net_qty = item.quantity - item.returned_quantity
+        if net_qty <= 0:
+            continue
         prod_id = item.product_id
         if prod_id not in product_sales:
             product_sales[prod_id] = {
@@ -689,9 +702,10 @@ def daily_report(request):
                 'total_sales': Decimal('0'),
                 'total_cost': Decimal('0'),
             }
-        product_sales[prod_id]['quantity'] -= item.quantity
-        product_sales[prod_id]['total_sales'] -= item.unit_price * item.quantity + item.tax_amount
-        product_sales[prod_id]['total_cost'] -= item.purchase_cost * item.quantity
+        product_sales[prod_id]['quantity'] -= net_qty
+        tax_share = item.tax_amount * (net_qty / item.quantity) if item.quantity else Decimal('0')
+        product_sales[prod_id]['total_sales'] -= item.unit_price * net_qty + tax_share
+        product_sales[prod_id]['total_cost'] -= item.purchase_cost * net_qty
 
     for data in product_sales.values():
         data['profit'] = data['total_sales'] - data['total_cost']
@@ -922,7 +936,6 @@ def return_order(request, order_id):
         qty = item.quantity
         purchase_cost = item.purchase_cost
 
-        # BUG FIX: تغییر صریح موجودی
         product.inventory_cost += purchase_cost * qty
         product.stock_quantity += qty
         product.save()
@@ -961,7 +974,7 @@ def return_order(request, order_id):
     return redirect('management:order_list')
 
 
-# ==================== اصلاحیه سفارش ====================
+# ==================== اصلاحیه سفارش (با تخفیف نسبی) ====================
 
 @login_required
 @transaction.atomic
@@ -973,9 +986,17 @@ def edit_order(request, order_id):
         return_quantities = request.POST.getlist('return_quantities[]')
         payment_method = request.POST.get('payment_method', 'cash')
 
-        total_return_value = Decimal('0')
+        total_return_value = Decimal('0')       # مبلغ کامل برگشتی‌ها (قبل از تخفیف)
         total_return_tax = Decimal('0')
+        total_return_discount = Decimal('0')    # جمع تخفیف برگشتی
 
+        # ۱. محاسبه نسبت تخفیف
+        before_discount = original_order.subtotal + original_order.total_tax
+        discount_ratio = Decimal('0')
+        if before_discount > 0 and original_order.discount_amount > 0:
+            discount_ratio = original_order.discount_amount / before_discount
+
+        # ۲. پردازش اقلام برگشتی
         for item_id_str, qty_str in zip(return_items, return_quantities):
             try:
                 qty_to_return = Decimal(str(qty_str))
@@ -987,15 +1008,12 @@ def edit_order(request, order_id):
             original_item = get_object_or_404(OrderItem, pk=int(item_id_str), order=original_order)
             available = original_item.quantity - original_item.returned_quantity
             if qty_to_return > available:
-                messages.error(
-                    request,
-                    f'مقدار برگشتی برای {original_item.product} نمی‌تواند بیشتر از {available} باشد.'
-                )
+                messages.error(request, f'مقدار برگشتی برای {original_item.product} نمی‌تواند بیشتر از {available} باشد.')
                 return redirect('edit_order', order_id=order_id)
 
             product = original_item.product
 
-            # BUG FIX: تغییر صریح موجودی
+            # موجودی و ارزش انبار
             product.inventory_cost += original_item.purchase_cost * qty_to_return
             product.stock_quantity += qty_to_return
             product.save()
@@ -1007,16 +1025,24 @@ def edit_order(request, order_id):
                 reference=f"Edit Order #{original_order.id}"
             )
 
+            # به‌روزرسانی quantities در OrderItem
             original_item.returned_quantity += qty_to_return
             if original_item.returned_quantity >= original_item.quantity:
                 original_item.is_returned = True
             original_item.save()
 
-            tax_share = original_item.tax_amount * (qty_to_return / original_item.quantity)
-            item_total = original_item.unit_price * qty_to_return + tax_share
-            total_return_value += item_total
-            total_return_tax += tax_share
+            # محاسبه مبلغ کامل این برگشتی
+            tax_share = original_item.tax_amount * (qty_to_return / original_item.quantity) if original_item.quantity else Decimal('0')
+            item_full_value = original_item.unit_price * qty_to_return + tax_share
 
+            # سهم تخفیف این برگشتی
+            item_discount = item_full_value * discount_ratio if discount_ratio else Decimal('0')
+
+            total_return_value += item_full_value
+            total_return_tax += tax_share
+            total_return_discount += item_discount
+
+        # ۳. پردازش اقلام جدید (بدون تخفیف)
         new_product_ids = request.POST.getlist('new_product_ids[]')
         new_quantities = request.POST.getlist('new_quantities[]')
 
@@ -1033,7 +1059,6 @@ def edit_order(request, order_id):
 
             product = get_object_or_404(Product, pk=int(prod_id_str), is_active=True)
 
-            # BUG FIX: بررسی موجودی
             if product.stock_quantity < qty:
                 messages.error(request, f'موجودی «{product}» کافی نیست. موجودی فعلی: {product.stock_quantity}')
                 return redirect('edit_order', order_id=order_id)
@@ -1042,7 +1067,7 @@ def edit_order(request, order_id):
             tax, tax_lines = calculate_item_tax(price, qty, product)
             avg_cost = _get_avg_cost(product)
 
-            # BUG FIX: تغییر صریح موجودی
+            # کاهش موجودی
             product.inventory_cost -= avg_cost * qty
             product.stock_quantity -= qty
             product.save()
@@ -1072,7 +1097,10 @@ def edit_order(request, order_id):
             total_new_value += price * qty + tax
             total_new_tax += tax
 
-        value_diff = total_new_value - total_return_value
+        # ۴. محاسبه مابه‌التفاوت واقعی (با احتساب تخفیف برگشتی)
+        net_return_value = total_return_value - total_return_discount
+        value_diff = total_new_value - net_return_value
+
         if value_diff > 0:
             Payment.objects.create(
                 order=original_order,
@@ -1092,13 +1120,16 @@ def edit_order(request, order_id):
         else:
             messages.success(request, 'اصلاحیه بدون تغییر مبلغ ثبت شد.')
 
-        original_order.subtotal += (total_new_value - total_return_value) - (total_new_tax - total_return_tax)
-        original_order.total_tax += total_new_tax - total_return_tax
-        original_order.grand_total += value_diff
+        # ۵. به‌روزرسانی فاکتور اصلی
+        original_order.subtotal = original_order.subtotal - (total_return_value - total_return_tax) + (total_new_value - total_new_tax)
+        original_order.total_tax = original_order.total_tax - total_return_tax + total_new_tax
+        original_order.discount_amount = original_order.discount_amount - total_return_discount
+        original_order.grand_total = original_order.subtotal + original_order.total_tax - original_order.discount_amount
         original_order.save()
 
         return redirect('management:order_detail', pk=original_order.id)
 
+    # GET: نمایش فرم
     products = Product.objects.filter(is_active=True)
     order_items = []
     for item in original_order.items.all():

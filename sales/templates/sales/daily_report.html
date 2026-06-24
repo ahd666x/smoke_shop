@@ -7,14 +7,17 @@
 <head>
     <meta charset="UTF-8">
     <title>گزارش بازه‌ای — {{ display_start }} تا {{ display_end }}</title>
+
     <link rel="stylesheet" href="{% static 'css/bootstrap.min.css' %}">
-    <link rel="stylesheet" href="{% static 'css/persian-datepicker.min.css' %}">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/persian-datepicker@1.2.0/dist/css/persian-datepicker.min.css">
+
     <style>
         @media print {
             .no-print { display: none !important; }
             body { font-size: 14px; }
         }
         .card-stats { border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+        .range-input-width { min-width: 320px; text-align: center; font-weight: bold; cursor: pointer; background-color: #fff; }
     </style>
 </head>
 <body class="bg-light">
@@ -27,25 +30,25 @@
             </div>
         </div>
 
-        <form method="get" class="row g-2 mb-4 no-print">
+        <form method="get" class="row g-2 mb-4 no-print align-items-end">
             <div class="col-auto">
-                <label class="form-label">از تاریخ</label>
-                <input type="text" id="start-date-jalali" class="form-control" placeholder="۱۴۰۳/۰۱/۰۱">
+                <label class="form-label">انتخاب بازه زمانی (روی کادر کلیک کنید)</label>
+                <!-- حذف readonly تا تقویم باز شود -->
+                <input type="text" id="date-range-jalali" class="form-control range-input-width"
+                       placeholder="برای انتخاب کلیک کنید" autocomplete="off">
+                
                 <input type="hidden" name="start_date" id="start_date" value="{{ input_start }}">
-            </div>
-            <div class="col-auto">
-                <label class="form-label">تا تاریخ</label>
-                <input type="text" id="end-date-jalali" class="form-control" placeholder="۱۴۰۳/۰۱/۰۱">
                 <input type="hidden" name="end_date" id="end_date" value="{{ input_end }}">
             </div>
-            <div class="col-auto align-self-end">
+            <div class="col-auto">
                 <button type="submit" class="btn btn-primary">نمایش</button>
             </div>
-            <div class="col-auto align-self-end">
+            <div class="col-auto">
                 <a href="{% url 'daily_report' %}" class="btn btn-outline-secondary">امروز</a>
             </div>
         </form>
 
+        <!-- کارت‌های آماری -->
         <div class="row g-3 mb-5">
             <div class="col-md-3">
                 <div class="card card-stats bg-primary text-white">
@@ -81,6 +84,7 @@
             </div>
         </div>
 
+        <!-- لیست فاکتورها -->
         <h3>فاکتورهای {{ display_start }} تا {{ display_end }}</h3>
         {% if orders %}
         <div class="table-responsive">
@@ -122,7 +126,7 @@
                                         <td>{{ item.quantity|format_quantity }}</td>
                                         <td>{{ item.unit_price|floatformat:"0"|intcomma }}</td>
                                         <td>{{ item.tax_amount|floatformat:"0"|intcomma }}</td>
-                                        <td>{{ item.unit_price|floatformat:"0"|add:item.tax_amount|floatformat:"0"|intcomma }}</td>
+                                        <td>{{ item.row_total|floatformat:"0"|intcomma }}</td>
                                     </tr>
                                     {% endfor %}
                                 </tbody>
@@ -137,6 +141,7 @@
         <div class="alert alert-info">هیچ فاکتوری در این بازه ثبت نشده است.</div>
         {% endif %}
 
+        <!-- فروش بر اساس کالا -->
         <h3 class="mt-5">فروش بر اساس کالا</h3>
         {% if product_sales %}
         <div class="table-responsive">
@@ -166,59 +171,60 @@
         {% endif %}
     </div>
 
+    <!-- اسکریپت‌ها: jQuery, سپس jdatetime, سپس PersianDatepicker -->
     <script src="{% static 'js/bootstrap.bundle.min.js' %}"></script>
-    <script src="{% static 'js/jquery-3.6.4.min.js' %}"></script>
-    <script src="{% static 'js/persian-datepicker.min.js' %}"></script>
+    <script src="https://code.jquery.com/jquery-3.6.4.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/jdatetime@4.0.0/dist/jdatetime.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/persian-datepicker@1.2.0/dist/js/persian-datepicker.min.js"></script>
+
     <script>
         $(document).ready(function() {
-            $('#start-date-jalali').pDatepicker({
+            const initialStart = "{{ display_start }}";
+            const initialEnd   = "{{ display_end }}";
+
+            // مقدار اولیه
+            if (initialStart && initialEnd) {
+                $('#date-range-jalali').val(initialStart + ' تا ' + initialEnd);
+            }
+
+            // تابع تبدیل Date میلادی به رشته YYYY-MM-DD
+            function getGregorianString(dateObj) {
+                return dateObj.getFullYear() + '-' +
+                       String(dateObj.getMonth() + 1).padStart(2, '0') + '-' +
+                       String(dateObj.getDate()).padStart(2, '0');
+            }
+
+            // فعال‌سازی Datepicker روی همان input
+            $('#date-range-jalali').pDatepicker({
                 format: 'YYYY/MM/DD',
-                initialValue: true,
-                autoClose: true,
+                autoClose: false,            // در رنج باید باز بماند
+                initialValue: false,
                 calendar: {
-                    persian: {
-                        locale: 'fa'
-                    }
+                    persian: { locale: 'fa' }
                 },
-                onSelect: function(selectedDate) {
-                    const parts = selectedDate.split('/');
-                    const jDate = jdatetime.date(parseInt(parts[0]), parseInt(parts[1]), parseInt(parts[2]));
-                    const gDate = jDate.togregorian();
-                    const gDateStr = gDate.toISOString().split('T')[0];
-                    $('#start_date').val(gDateStr);
+                rangeSelector: {
+                    enabled: true,
+                    responsive: true
+                },
+                onSelect: function(unix) {
+                    if (Array.isArray(unix) && unix.length === 2) {
+                        const startUnix = unix[0];
+                        const endUnix   = unix[1];
+
+                        // تبدیل به میلادی و پر کردن فیلدهای مخفی
+                        const startDateObj = new Date(startUnix);
+                        $('#start_date').val(getGregorianString(startDateObj));
+
+                        const endDateObj   = new Date(endUnix);
+                        $('#end_date').val(getGregorianString(endDateObj));
+
+                        // نمایش شمسی در کادر متنی
+                        const pStart = new jdatetime.date.fromGregorian(startDateObj).format('YYYY/MM/DD');
+                        const pEnd   = new jdatetime.date.fromGregorian(endDateObj).format('YYYY/MM/DD');
+                        $('#date-range-jalali').val(pStart + ' تا ' + pEnd);
+                    }
                 }
             });
-
-            $('#end-date-jalali').pDatepicker({
-                format: 'YYYY/MM/DD',
-                initialValue: true,
-                autoClose: true,
-                calendar: {
-                    persian: {
-                        locale: 'fa'
-                    }
-                },
-                onSelect: function(selectedDate) {
-                    const parts = selectedDate.split('/');
-                    const jDate = jdatetime.date(parseInt(parts[0]), parseInt(parts[1]), parseInt(parts[2]));
-                    const gDate = jDate.togregorian();
-                    const gDateStr = gDate.toISOString().split('T')[0];
-                    $('#end_date').val(gDateStr);
-                }
-            });
-
-            // Set initial values if they exist
-            {% if input_start %}
-            var startDate = new Date('{{ input_start }}');
-            var jStartDate = jdatetime.date.fromgregorian(date=startDate);
-            $('#start-date-jalali').val(jStartDate.strftime('%Y/%m/%d'));
-            {% endif %}
-
-            {% if input_end %}
-            var endDate = new Date('{{ input_end }}');
-            var jEndDate = jdatetime.date.fromgregorian(date=endDate);
-            $('#end-date-jalali').val(jEndDate.strftime('%Y/%m/%d'));
-            {% endif %}
         });
     </script>
 </body>
