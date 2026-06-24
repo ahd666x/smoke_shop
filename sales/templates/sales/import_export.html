@@ -1,0 +1,45 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <title>مدیریت داده‌ها (Excel)</title>
+    <link rel="stylesheet" href="{% static 'css/bootstrap.min.css' %}">
+</head>
+<body class="container mt-5">
+    <h2 class="mb-4">ورودی / خروجی داده‌ها (Excel)</h2>
+    {% if messages %}
+        {% for msg in messages %}
+            <div class="alert alert-{% if msg.tags == 'error' %}danger{% else %}success{% endif %}">{{ msg }}</div>
+        {% endfor %}
+    {% endif %}
+
+    <div class="row">
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">خروجی Excel</div>
+                <div class="card-body">
+                    <p>یک فایل Excel شامل تمام داده‌های فروشگاه (هر جدول در یک شیت) دانلود کنید.</p>
+                    <a href="{% url 'export_data' %}" class="btn btn-success">دانلود فایل Excel</a>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">وارد کردن از فایل Excel</div>
+                <div class="card-body">
+                    <p>فایل Excel پشتیبان (با ساختار مشابه خروجی) را انتخاب کنید.</p>
+                    <form method="post" enctype="multipart/form-data">
+                        {% csrf_token %}
+                        <input type="file" name="data_file" class="form-control mb-3" accept=".xlsx" required>
+                        <button type="submit" class="btn btn-primary">بارگذاری و وارد کردن</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+    <a href="{% url 'dashboard' %}" class="btn btn-secondary mt-3">بازگشت به داشبورد</a>
+
+    <script src="{% static 'js/bootstrap.bundle.min.js' %}"></script>
+</body>
+</html>

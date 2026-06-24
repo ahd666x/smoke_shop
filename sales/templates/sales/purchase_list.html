@@ -1,0 +1,50 @@
+{% extends 'sales/base.html' %}
+{% load humanize %}
+
+{% block title %}لیست خریدها{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2>📦 لیست خریدها</h2>
+    <a href="{% url 'purchase_create' %}" class="btn btn-success">➕ ثبت خرید جدید</a>
+</div>
+
+{% if purchases %}
+<div class="table-responsive">
+    <table class="table table-striped table-hover">
+        <thead class="table-dark">
+            <tr>
+                <th>شماره</th>
+                <th>تأمین‌کننده</th>
+                <th>تاریخ</th>
+                <th>مبلغ کل (تومان)</th>
+                <th>وضعیت پرداخت</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for purchase in purchases %}
+            <tr>
+                <td>{{ purchase.id }}</td>
+                <td>{{ purchase.supplier.name }}</td>
+                <td>{{ purchase.created_at|date:"Y/m/d H:i" }}</td>
+                <td>{{ purchase.total_amount|intcomma }}</td>
+                <td>
+                    {% if purchase.is_paid %}
+                        <span class="badge bg-success">پرداخت شده</span>
+                    {% else %}
+                        <span class="badge bg-warning text-dark">بدهی</span>
+                    {% endif %}
+                </td>
+            </tr>
+            {% empty %}
+            <tr>
+                <td colspan="5" class="text-center">هیچ خریدی ثبت نشده است.</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% else %}
+<div class="alert alert-info">هنوز هیچ خریدی ثبت نشده است. <a href="{% url 'purchase_create' %}">ثبت اولین خرید</a></div>
+{% endif %}
+{% endblock %}

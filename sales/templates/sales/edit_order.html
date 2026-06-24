@@ -1,0 +1,110 @@
+{% extends 'sales/base.html' %}
+{% load humanize %}
+{% load jalali_filters %}
+{% load custom_filters %}
+
+{% block title %}اصلاحیه سفارش #{{ order.id }}{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <h2>اصلاحیه سفارش شماره {{ order.id }}</h2>
+    <p>تاریخ: {{ order.created_at|jalali_date }}</p>
+    <p>مشتری: {{ order.customer.name|default:"عمومی" }}</p>
+    <p>مبلغ فعلی: {{ order.grand_total|intcomma }} تومان</p>
+
+    <form method="post">
+        {% csrf_token %}
+
+        <h4 class="mt-4">اقلام فعلی (برگشت جزئی)</h4>
+        <table class="table table-bordered">
+            <thead class="table-light">
+                <tr><th>کالا</th><th>تعداد فروخته</th><th>قبلاً برگشت</th><th>قابل برگشت</th><th>تعداد برگشتی</th></tr>
+            </thead>
+            <tbody>
+                {% for item in order_items %}
+                <tr>
+                    <td>{{ item.product }}</td>
+                    <td>{{ item.quantity|format_quantity }}</td>
+                    <td>{{ item.returned_quantity|format_quantity }}</td>
+                    <td>{{ item.available_qty|format_quantity }}</td>
+                    <td>
+                        <input type="number" name="return_quantities[]" min="0" max="{{ item.available_qty }}"
+                               value="0" step="any" class="form-control" style="max-width:120px;">
+                        <input type="hidden" name="return_item_ids[]" value="{{ item.id }}">
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+
+        <h4 class="mt-4">افزودن کالای جدید</h4>
+        <div id="new-items">
+            <div class="row g-2 mb-2 new-item-row">
+                <div class="col-md-6">
+                    <input type="text" class="form-control product-search" placeholder="جستجوی کالا..." oninput="filterProducts(this)">
+                    <select name="new_product_ids[]" class="form-select product-select mt-1">
+                        <option value="">-- انتخاب کالا --</option>
+                        {% for product in products %}
+                            <option value="{{ product.id }}" data-name="{{ product.name|lower }}" data-barcode="{{ product.barcode|lower }}">{{ product }} (موجودی: {{ product.stock_quantity|format_quantity }})</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-4">
+                    <input type="number" name="new_quantities[]" min="0.001" value="1" step="any"
+                           class="form-control" placeholder="تعداد">
+                </div>
+                <div class="col-md-2">
+                    <button type="button" class="btn btn-danger" onclick="this.closest('.new-item-row').remove()">حذف</button>
+                </div>
+            </div>
+        </div>
+        <button type="button" class="btn btn-secondary mb-3" onclick="addNewItemRow()">➕ افزودن کالای دیگر</button>
+
+        <div class="mb-3">
+            <label class="form-label">روش تسویه مابه‌التفاوت</label>
+            <select name="payment_method" class="form-select" style="max-width:200px;">
+                <option value="cash">نقد</option>
+                <option value="card">کارت</option>
+                <option value="credit">اعتباری</option>
+            </select>
+        </div>
+
+        <hr>
+        <button type="submit" class="btn btn-primary">ثبت اصلاحیه</button>
+        <a href="{% url 'management:order_detail' order.id %}" class="btn btn-secondary">بازگشت</a>
+    </form>
+</div>
+
+<script>
+function addNewItemRow() {
+    const container = document.getElementById('new-items');
+    const row = document.querySelector('.new-item-row').cloneNode(true);
+    row.querySelector('select').value = '';
+    row.querySelector('input[type="number"]').value = 1;
+    row.querySelector('.product-search').value = '';
+    container.appendChild(row);
+}
+
+function filterProducts(input) {
+    const searchTerm = input.value.toLowerCase();
+    const select = input.nextElementSibling;
+    const options = select.querySelectorAll('option');
+
+    options.forEach(option => {
+        if (option.value === '') {
+            option.style.display = '';
+            return;
+        }
+        const name = option.getAttribute('data-name') || '';
+        const barcode = option.getAttribute('data-barcode') || '';
+        const text = option.text.toLowerCase();
+
+        if (name.includes(searchTerm) || barcode.includes(searchTerm) || text.includes(searchTerm)) {
+            option.style.display = '';
+        } else {
+            option.style.display = 'none';
+        }
+    });
+}
+</script>
+{% endblock %}

@@ -1,0 +1,32 @@
+{% extends 'sales/base.html' %}
+{% block title %}گزارش مالیات{% endblock %}
+{% block content %}
+<h2>گزارش تفکیکی مالیات‌ها</h2>
+<form method="get" class="row g-2 mb-4">
+    <div class="col-auto">
+        <label>از تاریخ:</label>
+        <input type="date" name="start" value="{{ start }}" class="form-control">
+    </div>
+    <div class="col-auto">
+        <label>تا تاریخ:</label>
+        <input type="date" name="end" value="{{ end }}" class="form-control">
+    </div>
+    <div class="col-auto align-self-end">
+        <button type="submit" class="btn btn-primary">نمایش</button>
+    </div>
+</form>
+
+<table class="table table-striped">
+    <thead>
+        <tr><th>نوع مالیات</th><th>مبلغ کل (ریال)</th></tr>
+    </thead>
+    <tbody>
+        {% for row in tax_data %}
+        <tr><td>{{ row.rule_name }}</td><td>{{ row.total|floatformat:0 }}</td></tr>
+        {% empty %}
+        <tr><td colspan="2">داده‌ای یافت نشد</td></tr>
+        {% endfor %}
+    </tbody>
+</table>
+<a href="{% url 'home' %}" class="btn btn-secondary">بازگشت</a>
+{% endblock %}

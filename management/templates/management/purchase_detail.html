@@ -1,0 +1,53 @@
+{% extends 'management/base.html' %}
+{% load humanize %}
+
+{% block title %}جزئیات خرید #{{ purchase.id }}{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-8">
+        <h3>خرید شماره {{ purchase.id }}</h3>
+        <p><strong>تأمین‌کننده:</strong> {{ purchase.supplier.name }}</p>
+        <p><strong>تاریخ:</strong> {{ purchase.created_at|date:"Y/m/d H:i" }}</p>
+        <p><strong>وضعیت پرداخت:</strong>
+            {% if purchase.is_paid %}
+                <span class="badge bg-success">پرداخت شده</span>
+            {% else %}
+                <span class="badge bg-warning">بدهی</span>
+            {% endif %}
+        </p>
+    </div>
+    <div class="col-md-4 text-end">
+        <a href="{% url 'management:purchase_list' %}" class="btn btn-outline-secondary">بازگشت به لیست</a>
+    </div>
+</div>
+
+<hr>
+<h5>اقلام خرید</h5>
+<table class="table table-bordered">
+    <thead class="table-light">
+        <tr>
+            <th>کالا</th>
+            <th>تعداد</th>
+            <th>قیمت خرید (تومان)</th>
+            <th>جمع (تومان)</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for item in items %}
+        <tr>
+            <td>{{ item.product }}</td>
+            <td>{{ item.quantity }}</td>
+            <td>{{ item.unit_price|intcomma }}</td>
+            <td>{{ item.row_total|intcomma }}</td>
+            {# می‌توان در ویو محاسبه کرد، اما با اضافه کردن یک فیلد row_total در ویو بهتر است #}
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+
+<hr>
+<div class="text-end">
+    <a href="{% url 'management:purchase_list' %}" class="btn btn-secondary">بازگشت</a>
+</div>
+{% endblock %}

@@ -1,0 +1,26 @@
+{% extends 'management/base.html' %}
+{% load humanize %}
+
+{% block title %}حذف قلم خرید{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-6">
+        <div class="card border-danger">
+            <div class="card-header bg-danger text-white">⚠️ حذف قلم خرید</div>
+            <div class="card-body">
+                <p>آیا از حذف این قلم خرید اطمینان دارید؟</p>
+                <p><strong>کالا:</strong> {{ object.product }}</p>
+                <p><strong>تعداد:</strong> {{ object.quantity }}</p>
+                <p><strong>قیمت واحد:</strong> {{ object.unit_price|intcomma }} تومان</p>
+                <p class="text-danger">موجودی و میانگین موزون به‌روز می‌شوند.</p>
+                <form method="post">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-danger">بله، حذف کن</button>
+                    <a href="{% url 'management:product_purchase_history' object.product.pk %}" class="btn btn-secondary">لغو</a>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,91 @@
+{% extends 'management/base.html' %}
+{% load humanize %}
+{% load jalali_filters %}
+{% block title %}جزئیات سفارش #{{ order.id }}{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-8">
+        <h3>سفارش شماره {{ order.id }}</h3>
+        <p><strong>تاریخ:</strong> {{ order.created_at|jalali_date }}</p>
+        <p><strong>مشتری:</strong> {{ order.customer_name|default:"عمومی" }}</p>
+        <p><strong>وضعیت پرداخت:</strong>
+            {% if order.is_paid %}
+                <span class="badge bg-success">پرداخت شده</span>
+            {% else %}
+                <span class="badge bg-warning">در انتظار</span>
+            {% endif %}
+        </p>
+
+        {% if order.discount_type != 'none' %}
+            <p><strong>تخفیف:</strong>
+                {% if order.discount_type == 'percent' %}
+                    {{ order.discount_value|intcomma }} درصد
+                {% elif order.discount_type == 'amount' %}
+                    {{ order.discount_value|intcomma }} تومان
+                {% endif %}
+                <span class="text-muted">(مبلغ تخفیف: {{ order.discount_amount|intcomma }} تومان)</span>
+            </p>
+        {% endif %}
+
+        {% if not order.is_return and order.is_paid %}
+            <a href="{% url 'edit_order' order.id %}" class="btn btn-warning">✏️ اصلاحیه</a>
+            <form method="post" action="{% url 'return_order' order.id %}" style="display:inline;">
+                {% csrf_token %}
+                <button type="submit" class="btn btn-danger" onclick="return confirm('آیا از برگشت کامل این فاکتور اطمینان دارید؟')">
+                    🔄 برگشت فاکتور
+                </button>
+            </form>
+        {% endif %}
+    </div>
+    <div class="col-md-4 text-end">
+        <a href="{% url 'management:order_list' %}" class="btn btn-outline-secondary">بازگشت به لیست</a>
+    </div>
+</div>
+
+<hr>
+<h5>اقلام</h5>
+<table class="table table-bordered">
+    <thead class="table-light">
+        <tr>
+            <th>کالا</th>
+            <th>تعداد</th>
+            <th>فی (تومان)</th>
+            <th>بهای تمام‌شده (تومان)</th>
+            <th>مالیات (تومان)</th>
+            <th>جمع (تومان)</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for item in items %}
+        <tr>
+            <td>{{ item.product }}</td>
+            <td>{{ item.quantity }}</td>
+            <td>{{ item.unit_price|intcomma }}</td>
+            <td>{{ item.purchase_cost|intcomma }}</td>
+            <td>{{ item.tax_amount|intcomma }}</td>
+            <td>{{ item.row_total|intcomma }}</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+
+<h5>پرداخت‌ها</h5>
+{% if payments %}
+    <ul class="list-group mb-3">
+        {% for pay in payments %}
+            <li class="list-group-item d-flex justify-content-between">
+                <span>{{ pay.get_method_display }}</span>
+                <span>{{ pay.amount|intcomma }} تومان</span>
+            </li>
+        {% endfor %}
+    </ul>
+{% else %}
+    <div class="alert alert-warning">پرداختی ثبت نشده است.</div>
+{% endif %}
+
+<hr>
+<div class="text-end">
+    <a href="{% url 'management:order_list' %}" class="btn btn-secondary">بازگشت</a>
+</div>
+{% endblock %}

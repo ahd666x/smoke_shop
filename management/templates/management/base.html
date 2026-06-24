@@ -1,0 +1,55 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <title>{% block title %}پنل مدیریت{% endblock %}</title>
+    <link rel="stylesheet" href="{% static 'css/bootstrap.min.css' %}">
+    <link rel="stylesheet" href="{% static 'css/bootstrap-icons.css' %}"> <!-- اختیاری، برای آیکون‌ها -->
+    <style>
+        body { background: #f4f6f9; font-family: 'Vazir', Tahoma, sans-serif; }
+        .sidebar { background: #1e293b; min-height: 100vh; padding-top: 20px; }
+        .sidebar a { color: #cbd5e1; display: block; padding: 10px 15px; text-decoration: none; border-radius: 5px; margin: 2px 0; }
+        .sidebar a:hover, .sidebar a.active { background: #334155; color: #fff; }
+        .content { padding: 25px; }
+    </style>
+</head>
+<body>
+    <div class="container-fluid">
+        <div class="row">
+            <nav class="col-md-2 d-none d-md-block sidebar">
+                <h4 class="text-white text-center mb-4">📊 مدیریت</h4>
+                <a href="{% url 'home' %}" class="{% if request.resolver_match.url_name == 'home' %}active{% endif %}">🏠 داشبورد اصلی</a>
+                <hr class="text-secondary">
+                <h6 class="text-uppercase text-white-50 px-3">کالا و انبار</h6>
+                <a href="{% url 'management:category_list' %}">دسته‌بندی‌ها</a>
+                <a href="{% url 'management:product_list' %}">محصولات</a>
+                <a href="{% url 'management:supplier_list' %}">تأمین‌کنندگان</a>
+                <a href="{% url 'management:purchase_list' %}">خریدها</a> 
+                <a href="{% url 'management:stockmovement_list' %}">گردش انبار</a>
+                <hr class="text-secondary">
+                <h6 class="text-uppercase text-white-50 px-3">مالیات</h6>
+                <a href="{% url 'management:taxrule_list' %}">قوانین مالیاتی</a>
+                <a href="{% url 'management:producttaxprofile_list' %}">پروفایل مالیاتی</a>
+                <hr class="text-secondary">
+                <h6 class="text-uppercase text-white-50 px-3">فروش</h6>
+                <a href="{% url 'management:order_list' %}">سفارش‌ها</a>
+                <a href="{% url 'management:payment_list' %}">پرداخت‌ها</a>
+                <hr class="text-secondary">
+                <a href="{% url 'import_export' %}">📥 ورودی/خروجی اکسل</a>
+            </nav>
+
+            <main class="col-md-10 ms-sm-auto px-md-4 content">
+                {% block content %}{% endblock %}
+            </main>
+        </div>
+    </div>
+{% if messages %}
+    {% for message in messages %}
+        <div class="alert alert-{{ message.tags }}">{{ message }}</div>
+    {% endfor %}
+{% endif %}
+    <script src="{% static 'js/bootstrap.bundle.min.js' %}"></script>
+    {% block extra_js %}{% endblock %}
+</body>
+</html>

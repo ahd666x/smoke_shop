@@ -1,0 +1,103 @@
+{% extends 'management/base.html' %}
+{% block title %}لیست {{ model_verbose_name }}{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2>لیست {{ model_verbose_name }}</h2>
+    <div>
+        {% if create_url %}
+            <a href="{{ create_url }}" class="btn btn-success">➕ {{ model_verbose_name }} جدید</a>
+        {% endif %}
+    </div>
+</div>
+
+{% if search %}
+    <div class="alert alert-info">نتایج جستجو برای «{{ search }}»</div>
+{% endif %}
+
+<!-- فرم جستجو -->
+<form method="get" class="row g-2 mb-4">
+    <div class="col-auto">
+        <input type="text" name="q" class="form-control" placeholder="جستجو..." value="{{ search }}">
+    </div>
+    <div class="col-auto">
+        <button type="submit" class="btn btn-outline-primary">🔍 جستجو</button>
+    </div>
+</form>
+
+<div class="table-responsive">
+    <table class="table table-striped table-hover align-middle">
+        <thead class="table-dark">
+            <tr>
+                {% for col_name, col_label in list_columns %}
+                    <th>{{ col_label }}</th>
+                {% endfor %}
+                <th>عملیات</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for row in table_rows %}
+            <tr>
+                {% for value in row.values %}
+                    <td>
+                        {% if forloop.first and row.detail_url %}
+                            <a href="{{ row.detail_url }}">{{ value }}</a>
+                        {% else %}
+                            {{ value }}
+                        {% endif %}
+                    </td>
+                {% endfor %}
+                <td>
+                    <div class="btn-group btn-group-sm">
+                        {% if row.purchase_history_url %}
+                            <a href="{{ row.purchase_history_url }}" class="btn btn-info" title="تاریخچه خرید">📜</a>
+                        {% endif %}
+                        {% if detail_url_pattern %}
+                            <a href="{% url detail_url_pattern row.object.pk %}" class="btn btn-info" title="جزئیات">📋</a>
+                        {% endif %}
+                        {% if update_url_pattern %}
+                            <a href="{% url update_url_pattern row.object.pk %}" class="btn btn-warning" title="ویرایش">✏️</a>
+                        {% endif %}
+                        {% if delete_url_pattern %}
+                            <button type="button" class="btn btn-danger" data-bs-toggle="modal" data-bs-target="#deleteModal{{ row.object.pk }}" title="حذف">🗑️</button>
+                        {% endif %}
+                    </div>
+
+                    {% if delete_url_pattern %}
+                    <!-- Modal حذف -->
+                    <div class="modal fade" id="deleteModal{{ row.object.pk }}" tabindex="-1">
+                      <div class="modal-dialog modal-dialog-centered">
+                        <div class="modal-content">
+                          <div class="modal-header bg-danger text-white">
+                            <h5 class="modal-title">حذف {{ model_verbose_name }}</h5>
+                            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                          </div>
+                          <div class="modal-body">
+                            <p>آیا از حذف «{{ row.object }}» اطمینان دارید؟</p>
+                            <small class="text-muted">این عملیات قابل بازگشت نیست.</small>
+                          </div>
+                          <div class="modal-footer">
+                            <form method="post" action="{% url delete_url_pattern row.object.pk %}">
+                              {% csrf_token %}
+                              <button type="submit" class="btn btn-danger">بله، حذف کن</button>
+                            </form>
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">انصراف</button>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                    {% endif %}
+                </td>
+            </tr>
+            {% empty %}
+            <tr>
+                <td colspan="{{ list_columns|length|add:1 }}" class="text-center text-muted py-5">
+                    <h5>هیچ داده‌ای یافت نشد</h5>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+{% include 'management/includes/pagination.html' %}
+{% endblock %}

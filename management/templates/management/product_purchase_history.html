@@ -1,0 +1,110 @@
+{% extends 'management/base.html' %}
+{% load humanize %}
+{% load jalali_filters %}
+
+{% block title %}تاریخچه {{ product }}{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2>📦 تاریخچه خرید و فروش: {{ product }}</h2>
+    <a href="{% url 'management:product_list' %}" class="btn btn-secondary">بازگشت به لیست</a>
+</div>
+
+<div class="row g-3 mb-4">
+    <div class="col-md-3">
+        <div class="card bg-primary text-white">
+            <div class="card-body">
+                <h6>موجودی فعلی</h6>
+                <h4>{{ current_stock }}</h4>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card bg-success text-white">
+            <div class="card-body">
+                <h6>میانگین موزون</h6>
+                <h4>{{ current_avg|floatformat:"0"|intcomma }} تومان</h4>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card bg-warning text-dark">
+            <div class="card-body">
+                <h6>ارزش کل موجودی</h6>
+                <h4>{{ current_value|floatformat:"0"|intcomma }} تومان</h4>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="card mb-4">
+    <div class="card-header bg-info text-white">🛒 تاریخچه خریدها</div>
+    <div class="card-body p-0">
+        {% if purchases %}
+        <table class="table table-striped mb-0">
+            <thead>
+                <tr>
+                    <th>تاریخ</th>
+                    <th>فاکتور #</th>
+                    <th>تأمین‌کننده</th>
+                    <th>تعداد</th>
+                    <th>قیمت واحد</th>
+                    <th>جمع</th>
+                    <th>عملیات</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in purchases %}
+                <tr>
+                    <td>{{ item.purchase.created_at|jalali_date:"%Y/%m/%d %H:%M" }}</td>
+                    <td><a href="{% url 'management:purchase_detail' item.purchase.id %}">{{ item.purchase.id }}</a></td>
+                    <td>{{ item.purchase.supplier.name }}</td>
+                    <td>{{ item.quantity }}</td>
+                    <td>{{ item.unit_price|intcomma }}</td>
+                    <td>{{ item.row_total|floatformat:"0"|intcomma }}</td>
+                    <td>
+                        <a href="{% url 'management:purchase_item_update' item.id %}" class="btn btn-sm btn-warning">✏️</a>
+                        <a href="{% url 'management:purchase_item_delete' item.id %}" class="btn btn-sm btn-danger">🗑️</a>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <div class="p-3">هیچ خریدی ثبت نشده است.</div>
+        {% endif %}
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header bg-secondary text-white">📤 تاریخچه فروش‌ها</div>
+    <div class="card-body p-0">
+        {% if sales %}
+        <table class="table table-striped mb-0">
+            <thead>
+                <tr>
+                    <th>تاریخ</th>
+                    <th>فاکتور #</th>
+                    <th>تعداد</th>
+                    <th>قیمت فروش</th>
+                    <th>بهای تمام‌شده</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in sales %}
+                <tr>
+                    <td>{{ item.order.created_at|jalali_date:"%Y/%m/%d %H:%M" }}</td>
+                    <td><a href="{% url 'management:order_detail' item.order.id %}">{{ item.order.id }}</a></td>
+                    <td>{{ item.quantity }}</td>
+                    <td>{{ item.unit_price|intcomma }}</td>
+                    <td>{{ item.purchase_cost|intcomma }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <div class="p-3">هیچ فروشی ثبت نشده است.</div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

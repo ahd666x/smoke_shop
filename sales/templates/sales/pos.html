@@ -1,0 +1,425 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <title>صندوق فروش</title>
+    <link rel="stylesheet" href="{% static 'css/bootstrap.min.css' %}">
+    <style>
+        body { background: #f4f6f9; font-family: 'Vazir', Tahoma, sans-serif; }
+        .navbar { background: #1e293b; }
+        .navbar-brand { font-weight: bold; letter-spacing: 1px; }
+        .card { border: none; border-radius: 15px; box-shadow: 0 0.125rem 0.25rem rgba(0,0,0,.075); }
+        .btn-primary { background-color: #3b82f6; border-color: #3b82f6; }
+        .btn-primary:hover { background-color: #2563eb; }
+        .btn-success { background-color: #10b981; border-color: #10b981; }
+        .btn-success:hover { background-color: #059669; }
+        .quantity-btn { min-width: 32px; font-weight: bold; }
+        #cart-table th { background-color: #f1f5f9; font-weight: 600; }
+        #cart-table td { vertical-align: middle; }
+        .tooman { font-size: 0.85rem; color: #64748b; }
+        .held-card {
+            border: 1px solid #e2e8f0;
+            border-radius: 12px;
+            background: #fff;
+            transition: box-shadow 0.2s;
+        }
+        .held-card:hover { box-shadow: 0 4px 12px rgba(0,0,0,0.08); }
+        .tooltip-inner { text-align: right; }
+    </style>
+</head>
+<body>
+
+<!-- نوار بالایی -->
+<nav class="navbar navbar-dark mb-4">
+    <div class="container-fluid">
+        <a class="navbar-brand" href="{% url 'home' %}">🏪 فروشگاه دخانیات</a>
+        <div class="d-flex">
+            <a href="{% url 'dashboard' %}" class="btn btn-outline-light btn-sm me-2">📊 داشبورد</a>
+            <a href="{% url 'home' %}" class="btn btn-outline-light btn-sm">🏠 خانه</a>
+        </div>
+    </div>
+</nav>
+
+<div class="container-fluid">
+    <!-- جستجو و اسکن -->
+    <div class="card mb-3 p-3">
+        <div class="input-group mb-3">
+            <span class="input-group-text bg-white">🔍</span>
+            <input type="text" id="barcode" class="form-control form-control-lg" placeholder="اسکن بارکد...">
+        </div>
+        <div class="input-group">
+            <input type="text" id="search-input" class="form-control" placeholder="جستجوی نام یا بارکد...">
+            <button class="btn btn-primary" onclick="searchProducts()">جستجو</button>
+        </div>
+        <ul id="search-results" class="list-group position-absolute w-100 mt-1" style="z-index:1000; display:none;"></ul>
+    </div>
+
+    <!-- سبد خرید -->
+    <div class="card p-3 mb-3">
+        <h4>🛒 سبد خرید</h4>
+        <div class="table-responsive">
+            <table class="table table-hover" id="cart-table">
+                <thead>
+                    <tr><th>کالا</th><th>تعداد</th><th>فی (تومان)</th><th>جمع (تومان)</th><th></th></tr>
+                </thead>
+                <tbody></tbody>
+            </table>
+        </div>
+
+        <div class="row mt-3 align-items-center">
+            <div class="col-md-4">
+                <div class="input-group">
+                    <select id="discount-type" class="form-select" style="max-width:120px;" onchange="updateDiscount()">
+                        <option value="amount" selected>مبلغی</option>
+                        <option value="percent">درصدی</option>
+                        <option value="none">بدون تخفیف</option>
+                    </select>
+                    <input type="number" id="discount-value" class="form-control" value="0" min="0" step="5000" onchange="updateDiscount()">
+                    <span class="input-group-text">تومان</span>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="d-flex justify-content-center fs-5">
+                    <span>قابل پرداخت: </span>
+                    <strong id="grand-total" class="text-primary ms-2">0</strong>
+                    <span> تومان</span>
+                </div>
+            </div>
+            <div class="col-md-4 text-end">
+                <button class="btn btn-outline-warning mb-2" onclick="holdOrder()">🛑 نگهداری سبد</button>
+                {% if held_count > 0 %}
+                    <button class="btn btn-outline-info" onclick="showHeldOrders()">📋 سبدهای نگهداری شده <span class="badge bg-danger held-badge">{{ held_count }}</span></button>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- بخش پرداخت -->
+    <div class="card p-3">
+        <div class="row">
+            <div class="col-md-6">
+                <button class="btn btn-success btn-lg w-100 mb-3" onclick="showPayment()">💳 پرداخت</button>
+            </div>
+            <div class="col-md-6">
+                <div id="payment-section" style="display:none;">
+                    <div class="mb-2">
+                        <label class="form-label">پرداخت نقدی (تومان)</label>
+                        <input type="number" id="cash-amount" class="form-control" value="0" min="0" step="5000" oninput="updateCardAmount()">
+                    </div>
+                    <div class="mb-2">
+                        <label class="form-label">پرداخت کارتی (تومان)</label>
+                        <input type="number" id="card-amount" class="form-control bg-light" value="0" readonly>
+                    </div>
+                    <div class="d-flex justify-content-between mb-3">
+                        <span>مجموع پرداختی:</span> <strong id="total-paid">0</strong> تومان
+                    </div>
+                    <div class="d-grid gap-2">
+                        <button class="btn btn-primary" onclick="finalizePayment()">پرداخت نهایی</button>
+                        <button class="btn btn-outline-secondary" onclick="hidePayment()">انصراف</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- مودال سبدهای نگهداری شده -->
+<div class="modal fade" id="heldModal" tabindex="-1">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5>سبدهای نگهداری‌شده</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body" id="held-list"></div>
+    </div>
+  </div>
+</div>
+
+<script src="{% static 'js/bootstrap.bundle.min.js' %}"></script>
+<script>
+    const csrftoken = '{{ csrf_token }}';
+    let grandTotalToman = 0;
+
+    // فعال‌سازی tooltip‌های بوت‌استرپ در کل صفحه (برای آیتم‌های پویا هم کار می‌کند)
+    function enableTooltips() {
+        var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'))
+        tooltipTriggerList.map(function (tooltipTriggerEl) {
+            return new bootstrap.Tooltip(tooltipTriggerEl, { placement: 'top' })
+        })
+    }
+
+    // راه‌اندازی اولیه
+    enableTooltips();
+    document.getElementById('barcode').focus();
+
+    // اسکن بارکد با Enter
+    document.getElementById('barcode').addEventListener('keypress', e => {
+        if (e.key === 'Enter') {
+            const barcode = e.target.value; e.target.value = '';
+            addProduct(barcode, null);
+        }
+    });
+
+    // ---------- جستجوی پیشرفته ----------
+    const searchInput = document.getElementById('search-input');
+    const searchResults = document.getElementById('search-results');
+
+    document.addEventListener('click', function(e) {
+        if (!searchInput.contains(e.target) && !searchResults.contains(e.target)) {
+            searchResults.style.display = 'none';
+        }
+    });
+
+    searchInput.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape') {
+            searchResults.style.display = 'none';
+            searchInput.blur();
+        }
+    });
+
+    searchInput.addEventListener('keypress', function(e) {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            searchProducts();
+        }
+    });
+
+    function searchProducts() {
+        const q = searchInput.value.trim();
+        if (q.length < 2) return;
+
+        fetch('/sales/search-products/?q=' + encodeURIComponent(q))
+            .then(r => r.json())
+            .then(data => {
+                searchResults.innerHTML = '';
+                if (data.length === 0) {
+                    searchResults.innerHTML = '<li class="list-group-item text-muted">نتیجه‌ای یافت نشد</li>';
+                } else {
+                    data.forEach(p => {
+                        const li = document.createElement('li');
+                        li.className = 'list-group-item list-group-item-action';
+                        li.style.cursor = 'pointer';
+                        let costText = p.cost ? `<br><small class="text-muted">قیمت خرید: ${p.cost.toLocaleString()} تومان</small>` : '';
+                        li.innerHTML = `${p.name} (${p.barcode}) - ${p.price.toLocaleString()} تومان${costText}`;
+                        li.addEventListener('click', function() {
+                            addProduct(null, p.id);
+                            searchResults.style.display = 'none';
+                            searchInput.value = '';
+                            searchInput.focus();
+                        });
+                        searchResults.appendChild(li);
+                    });
+                }
+                searchResults.style.display = 'block';
+            })
+            .catch(err => {
+                console.error(err);
+                searchResults.innerHTML = '<li class="list-group-item text-danger">خطا در جستجو</li>';
+                searchResults.style.display = 'block';
+            });
+    }
+
+    function addProduct(barcode, productId) {
+        fetch('/sales/add-to-cart/', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json', 'X-CSRFToken': csrftoken},
+            body: JSON.stringify(barcode ? {barcode} : {product_id: productId})
+        }).then(r => r.json()).then(data => updateCart(data));
+    }
+
+    function updateCart(data) {
+        let tbody = document.querySelector('#cart-table tbody');
+        tbody.innerHTML = '';
+        data.cart.forEach((item, idx) => {
+            const unitPrice = item.unit_price;
+            const rowTotal = (item.unit_price * item.quantity) + item.tax;
+            // ساخت tooltip برای قیمت خرید
+            let tooltipText = item.purchase_cost ? `قیمت خرید: ${item.purchase_cost.toLocaleString()} تومان` : '';
+        tbody.innerHTML += `<tr>
+            <td><span data-bs-toggle="tooltip" title="${tooltipText}">${item.name}</span></td>
+            <td style="white-space:nowrap;">
+                <button class="btn btn-sm btn-outline-secondary quantity-btn" onclick="updateCartItem(${idx}, 'decrease')">➖</button>
+                <input type="number"
+                       value="${item.quantity}"
+                       min="0.001"
+                       step="any"
+                       class="form-control form-control-sm d-inline-block"
+                       style="width:80px; text-align:center;"
+                       onchange="updateQuantityManually(${idx}, this.value)">
+                <button class="btn btn-sm btn-outline-secondary quantity-btn" onclick="updateCartItem(${idx}, 'increase')">➕</button>
+            </td>
+                <td>${unitPrice.toLocaleString()}</td>
+                <td>${rowTotal.toLocaleString()}</td>
+                <td><button class="btn btn-sm btn-danger" onclick="removeItem(${idx})">🗑️</button></td>
+            </tr>`;
+        });
+
+        document.getElementById('grand-total').textContent = data.grand_total.toLocaleString();
+        grandTotalToman = data.grand_total;
+
+        // فعال‌سازی tooltip‌ها برای عناصر جدید
+        enableTooltips();
+    }
+
+    function removeItem(idx) {
+        fetch('/sales/remove-from-cart/', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json', 'X-CSRFToken': csrftoken},
+            body: JSON.stringify({index: idx})
+        }).then(r => r.json()).then(data => { if (data.error) alert(data.error); else updateCart(data); });
+    }
+
+    function updateCartItem(idx, action) {
+        fetch('/sales/update-cart-item/', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json', 'X-CSRFToken': csrftoken},
+            body: JSON.stringify({index: idx, action: action})
+        }).then(r => r.json()).then(data => { if (data.error) alert(data.error); else updateCart(data); });
+    }
+
+    function updateQuantityManually(idx, newQuantity) {
+        const qty = parseFloat(newQuantity);
+        if (isNaN(qty) || qty <= 0) {
+            alert('مقدار تعداد باید یک عدد مثبت باشد.');
+            return;
+        }
+        fetch('/sales/update-cart-item/', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json', 'X-CSRFToken': csrftoken},
+            body: JSON.stringify({index: idx, action: 'set', quantity: qty})
+        }).then(r => r.json()).then(data => {
+            if (data.error) alert(data.error);
+            else updateCart(data);
+        });
+    }
+
+    function updateDiscount() {
+        const type = document.getElementById('discount-type').value;
+        let value = parseFloat(document.getElementById('discount-value').value) || 0;
+        fetch('/sales/apply-discount/', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json', 'X-CSRFToken': csrftoken},
+            body: JSON.stringify({type: type, value: value})
+        }).then(r => r.json()).then(data => updateCart(data));
+    }
+
+    function showPayment() {
+        document.getElementById('cash-amount').value = 0;
+        document.getElementById('card-amount').value = grandTotalToman;
+        document.getElementById('payment-section').style.display = 'block';
+        updateTotalPaid();
+    }
+
+    function hidePayment() { document.getElementById('payment-section').style.display = 'none'; }
+
+    function updateCardAmount() {
+        const cashToman = parseInt(document.getElementById('cash-amount').value) || 0;
+        const cardToman = Math.max(0, grandTotalToman - cashToman);
+        document.getElementById('card-amount').value = cardToman;
+        updateTotalPaid();
+    }
+
+    function updateTotalPaid() {
+        const cash = parseInt(document.getElementById('cash-amount').value) || 0;
+        const card = parseInt(document.getElementById('card-amount').value) || 0;
+        document.getElementById('total-paid').textContent = (cash + card).toLocaleString();
+    }
+
+    function finalizePayment() {
+        const cashToman = parseInt(document.getElementById('cash-amount').value) || 0;
+        const cardToman = parseInt(document.getElementById('card-amount').value) || 0;
+
+        if (cashToman + cardToman < grandTotalToman) {
+            alert('مبلغ پرداختی کافی نیست');
+            return;
+        }
+
+        fetch('/sales/checkout/', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json', 'X-CSRFToken': csrftoken},
+            body: JSON.stringify({
+                cash_amount: cashToman,
+                card_amount: cardToman,
+                credit_amount: 0,
+                customer_id: null
+            })
+        }).then(r => r.json()).then(data => {
+            if (data.error) alert(data.error);
+            else {
+                alert(data.message);
+                location.reload();
+            }
+        });
+    }
+
+    function holdOrder() {
+        if (confirm('سبد فعلی نگهداری شود؟')) {
+            fetch('/sales/hold-order/', { method:'POST', headers:{'X-CSRFToken': csrftoken} })
+                .then(r => r.json()).then(data => { alert(data.message); location.reload(); });
+        }
+    }
+
+    function showHeldOrders() {
+        fetch('/sales/held-orders/')
+            .then(r => r.json())
+            .then(data => {
+                const container = document.getElementById('held-list');
+                if (data.length === 0) {
+                    container.innerHTML = '<div class="text-center text-muted py-4">هیچ سبد نگهداری‌شده‌ای وجود ندارد.</div>';
+                } else {
+                    let html = '';
+                    data.forEach(o => {
+                        html += `
+                        <div class="card held-card mb-3">
+                            <div class="card-body">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <div>
+                                        <h6 class="mb-1">سفارش #${o.id}</h6>
+                                        <small class="text-muted">${o.held_at}</small>
+                                        <div class="mt-1">
+                                            <span class="badge bg-secondary">${o.items_count} قلم</span>
+                                            <span class="ms-2 fw-bold">${o.grand_total.toLocaleString()} تومان</span>
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <button class="btn btn-sm btn-primary me-1" onclick="resumeHeld(${o.id})">▶ ادامه</button>
+                                        <button class="btn btn-sm btn-outline-danger" onclick="deleteHeld(${o.id})">🗑 حذف</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>`;
+                    });
+                    container.innerHTML = html;
+                }
+                new bootstrap.Modal(document.getElementById('heldModal')).show();
+            });
+    }
+
+    function deleteHeld(orderId) {
+        if (!confirm('آیا از حذف این سبد نگهداری‌شده اطمینان دارید؟')) return;
+        fetch('/sales/delete-held-order/', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json', 'X-CSRFToken': csrftoken},
+            body: JSON.stringify({ order_id: orderId })
+        })
+        .then(r => r.json())
+        .then(data => {
+            alert(data.message);
+            showHeldOrders();
+        });
+    }
+
+    function resumeHeld(orderId) {
+        fetch('/sales/resume-held/', {
+            method:'POST', headers:{'Content-Type':'application/json','X-CSRFToken': csrftoken},
+            body: JSON.stringify({order_id: orderId})
+        }).then(r => r.json()).then(data => {
+            updateCart(data);
+            bootstrap.Modal.getInstance(document.getElementById('heldModal')).hide();
+        });
+    }
+</script>
+</body>
+</html>

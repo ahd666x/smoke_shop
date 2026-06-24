@@ -1,0 +1,78 @@
+{% extends 'sales/base.html' %}
+{% load humanize %}
+
+{% block title %}گزارش کالاهای کم‌موجود{% endblock %}
+
+{% block content %}
+<div class="container-fluid mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2>⚠️ کالاهای کم‌موجود</h2>
+        <a href="{% url 'dashboard' %}" class="btn btn-secondary">بازگشت به داشبورد</a>
+    </div>
+
+    <form method="get" class="row g-3 mb-4">
+        <div class="col-md-4">
+            <label class="form-label">دسته‌بندی</label>
+            <select name="category" class="form-select">
+                <option value="">همه دسته‌ها</option>
+                {% for cat in categories %}
+                    <option value="{{ cat.id }}" {% if selected_category and selected_category.id == cat.id %}selected{% endif %}>
+                        {{ cat.name }}
+                    </option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="col-md-2">
+            <label class="form-label">حداکثر موجودی (کمتر از)</label>
+            <input type="number" name="min_qty" value="{{ min_qty }}" min="0" step="any" class="form-control">
+        </div>
+        <div class="col-md-2 align-self-end">
+            <button type="submit" class="btn btn-primary">اعمال فیلتر</button>
+        </div>
+    </form>
+
+    <div class="card">
+        <div class="card-header bg-danger text-white">
+            کالاهایی با موجودی کمتر از {{ min_qty }}
+            {% if selected_category %} — دسته «{{ selected_category.name }}»{% endif %}
+        </div>
+        <div class="card-body p-0">
+            {% if products %}
+            <div class="table-responsive">
+                <table class="table table-striped table-hover mb-0">
+                    <thead class="table-dark">
+                        <tr>
+                            <th>کالا</th>
+                            <th>دسته</th>
+                            <th>موجودی</th>
+                            <th>میانگین خرید (تومان)</th>
+                            <th>ارزش موجودی (تومان)</th>
+                            <th>قیمت فروش (تومان)</th>
+                            <th>عملیات</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for product in products %}
+                        <tr>
+                            <td>{{ product }}</td>
+                            <td>{{ product.category.name }}</td>
+                            <td><span class="badge bg-danger">{{ product.stock_quantity }}</span></td>
+                            <td>{{ product.avg_cost|floatformat:"0"|intcomma }}</td>
+                            <td>{{ product.total_value|floatformat:"0"|intcomma }}</td>
+                            <td>{{ product.selling_price|intcomma }}</td>
+                            <td>
+                                <a href="{% url 'management:product_purchase_history' product.id %}" class="btn btn-sm btn-info" title="تاریخچه">📜</a>
+                                <a href="{% url 'management:product_update' product.id %}" class="btn btn-sm btn-warning" title="ویرایش">✏️</a>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <div class="p-3 text-success">✅ همه کالاها به اندازه کافی موجود هستند.</div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}
