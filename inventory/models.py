@@ -64,12 +64,18 @@ class StockMovement(models.Model):
         verbose_name_plural = "گردش‌های موجودی"
 
     def save(self, *args, **kwargs):
+        # BUG FIX: فقط رکورد StockMovement را ذخیره کن.
+        # تغییر stock_quantity باید به صورت صریح در ویو انجام شود
+        # تا از تداخل با product.save() در همان تراکنش جلوگیری شود.
+        super().save(*args, **kwargs)
+
+    def apply_to_product(self):
+        """اعمال تغییر موجودی روی محصول - باید به صورت صریح در ویو صدا زده شود"""
         if self.movement_type == 'in':
             self.product.stock_quantity += self.quantity
         else:
             self.product.stock_quantity -= self.quantity
         self.product.save()
-        super().save(*args, **kwargs)
 
     def __str__(self):
         return f"{self.product} - {self.get_movement_type_display()}"

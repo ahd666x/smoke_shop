@@ -15,83 +15,12 @@ from sales.models import Order, Payment, OrderItem
 import jdatetime
 from django.utils import timezone
 from datetime import datetime, date
+
+
 # ==================== کلاس‌های پایه ====================
 
 class BaseManagementView(LoginRequiredMixin):
     login_url = '/accounts/login/'
-
-
-# class BaseListView(BaseManagementView, ListView):
-#     paginate_by = 20
-#     template_name = 'management/generic_list.html'
-#     search_fields = []
-#     ordering = ['id']
-
-#     def get_update_url_pattern(self):
-#         app_label = self.model._meta.app_label
-#         model_name = self.model._meta.model_name
-#         return f'management:{model_name}_update'
-
-#     def get_delete_url_pattern(self):
-#         app_label = self.model._meta.app_label
-#         model_name = self.model._meta.model_name
-#         return f'management:{model_name}_delete'
-
-#     def get_detail_url_pattern(self):
-#         """بازگرداندن نام الگوی URL جزئیات (در صورت وجود). پیش‌فرض None."""
-#         return None
-
-#     def get_queryset(self):
-#         qs = super().get_queryset()
-#         search = self.request.GET.get('q', '')
-#         if search and self.search_fields:
-#             query = Q()
-#             for field in self.search_fields:
-#                 query |= Q(**{f"{field}__icontains": search})
-#             qs = qs.filter(query)
-#         return qs
-
-#     def get_context_data(self, **kwargs):
-#         context = super().get_context_data(**kwargs)
-#         context['search'] = self.request.GET.get('q', '')
-#         context['model_verbose_name'] = self.model._meta.verbose_name
-
-#         columns = self.get_list_columns()
-#         context['list_columns'] = columns
-#         context['create_url'] = self.get_create_url()
-#         context['update_url_pattern'] = self.get_update_url_pattern()
-#         context['delete_url_pattern'] = self.get_delete_url_pattern()
-#         context['detail_url_pattern'] = self.get_detail_url_pattern()
-
-#         # ساخت ردیف‌ها با فرمت اعداد و تاریخ
-#         rows = []
-#         for obj in context['object_list']:
-#             row_values = []
-#             for col_name, col_label in columns:
-#                 value = getattr(obj, col_name, '')
-#                 if isinstance(value, (int, float, Decimal)):
-#                     value = f'{value:,.0f}'
-#                 elif hasattr(value, 'strftime'):
-#                     if hasattr(value, 'hour'):
-#                         value = value.strftime('%Y/%m/%d %H:%M')
-#                     else:
-#                         value = value.strftime('%Y/%m/%d')
-#                 row_values.append(value)
-#             # برای OrderListView می‌توانیم detail_url شخصی را هم اضافه کنیم،
-#             # ولی در کلاس فرزند می‌توان آن را override کرد.
-#             row_data = {
-#                 'object': obj,
-#                 'values': row_values
-#             }
-#             rows.append(row_data)
-#         context['table_rows'] = rows
-#         return context
-
-#     def get_list_columns(self):
-#         raise NotImplementedError("ستون‌ها را مشخص کنید")
-
-#     def get_create_url(self):
-#         return None
 
 
 class BaseListView(BaseManagementView, ListView):
@@ -101,12 +30,10 @@ class BaseListView(BaseManagementView, ListView):
     ordering = ['id']
 
     def get_update_url_pattern(self):
-        app_label = self.model._meta.app_label
         model_name = self.model._meta.model_name
         return f'management:{model_name}_update'
 
     def get_delete_url_pattern(self):
-        app_label = self.model._meta.app_label
         model_name = self.model._meta.model_name
         return f'management:{model_name}_delete'
 
@@ -161,24 +88,6 @@ class BaseListView(BaseManagementView, ListView):
         return None
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 class BaseCreateView(BaseManagementView, CreateView):
     template_name = 'management/generic_form.html'
 
@@ -225,7 +134,6 @@ class BaseDeleteView(BaseManagementView, DeleteView):
     template_name = 'management/delete_confirm.html'
 
     def get_success_url(self):
-        app_label = self.model._meta.app_label
         model_name = self.model._meta.model_name
         return reverse_lazy(f'management:{model_name}_list')
 
@@ -253,12 +161,15 @@ class CategoryDeleteView(BaseDeleteView):
     model = Category
     success_url = reverse_lazy('management:category_list')
 
+
 # ----- Product -----
 class ProductListView(BaseListView):
     model = Product
     search_fields = ['name', 'barcode']
-    def get_list_columns(self): return [('name', 'نام'), ('barcode', 'بارکد'), ('selling_price', 'قیمت فروش'), ('stock_quantity', 'موجودی')]
-    def get_create_url(self): return reverse_lazy('management:product_create')
+    def get_list_columns(self):
+        return [('name', 'نام'), ('barcode', 'بارکد'), ('selling_price', 'قیمت فروش'), ('stock_quantity', 'موجودی')]
+    def get_create_url(self):
+        return reverse_lazy('management:product_create')
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -270,7 +181,8 @@ class ProductListView(BaseListView):
 
 class ProductCreateView(BaseCreateView):
     model = Product
-    fields = ['name', 'barcode', 'category', 'unit', 'purchase_price', 'selling_price', 'stock_quantity', 'is_active']
+    fields = ['name', 'barcode', 'category', 'unit', 'purchase_price', 'selling_price',
+              'stock_quantity', 'is_active', 'is_featured']
     success_url = reverse_lazy('management:product_list')
 
     def form_valid(self, form):
@@ -282,52 +194,39 @@ class ProductCreateView(BaseCreateView):
         product.save()
         return super().form_valid(form)
 
-# class ProductUpdateView(BaseUpdateView):
-#     model = Product
-#     fields = ['name', 'barcode', 'category', 'unit', 'purchase_price', 'selling_price', 'stock_quantity', 'is_active']
-#     success_url = reverse_lazy('management:product_list')
-
 class ProductUpdateView(BaseUpdateView):
     model = Product
-    fields = ['name', 'barcode', 'category', 'unit', 'purchase_price', 'selling_price', 'stock_quantity', 'is_active']
+    fields = ['name', 'barcode', 'category', 'unit', 'purchase_price', 'selling_price',
+              'stock_quantity', 'is_active', 'is_featured']
     success_url = reverse_lazy('management:product_list')
 
     def form_valid(self, form):
         product = form.save(commit=False)
-        # دریافت شیء قبلی از دیتابیس برای محاسبه تغییرات
         old_product = Product.objects.get(pk=product.pk)
         old_qty = old_product.stock_quantity
         new_qty = product.stock_quantity
 
         if old_qty > 0:
-            # میانگین موزون قبل از تغییر
             avg_cost = old_product.inventory_cost / old_qty
-            # تغییر موجودی = new_qty - old_qty
             delta_qty = new_qty - old_qty
-            # ارزش جدید = ارزش قبلی + (تغییر تعداد × میانگین قبلی)
             product.inventory_cost = old_product.inventory_cost + (delta_qty * avg_cost)
         else:
-            # اگر موجودی قبلاً صفر بوده، هر تغییری با قیمت خرید فعلی حساب شود
             if new_qty > 0 and product.purchase_price > 0:
                 product.inventory_cost = new_qty * product.purchase_price
             else:
                 product.inventory_cost = 0
 
+        # جلوگیری از inventory_cost منفی
+        if product.inventory_cost < 0:
+            product.inventory_cost = Decimal('0')
+
         product.save()
         return super().form_valid(form)
-
-
-
-
-
-
-
-
-
 
 class ProductDeleteView(BaseDeleteView):
     model = Product
     success_url = reverse_lazy('management:product_list')
+
 
 # ----- Supplier -----
 class SupplierListView(BaseListView):
@@ -350,26 +249,33 @@ class SupplierDeleteView(BaseDeleteView):
     model = Supplier
     success_url = reverse_lazy('management:supplier_list')
 
+
 # ----- StockMovement (فقط لیست) -----
 class StockMovementListView(BaseListView):
     model = StockMovement
-    def get_list_columns(self): return [('product', 'کالا'), ('quantity', 'تعداد'), ('movement_type', 'نوع'), ('created_at', 'تاریخ')]
+    def get_list_columns(self):
+        return [('product', 'کالا'), ('quantity', 'تعداد'), ('movement_type', 'نوع'), ('created_at', 'تاریخ')]
     def get_update_url_pattern(self): return None
     def get_delete_url_pattern(self): return None
 
+
+# ----- Purchase -----
 class PurchaseListView(BaseListView):
     model = Purchase
-    def get_list_columns(self): return [('supplier', 'تأمین‌کننده'), ('total_amount', 'مبلغ'), ('created_at', 'تاریخ')]
+    def get_list_columns(self):
+        return [('supplier', 'تأمین‌کننده'), ('total_amount', 'مبلغ'), ('created_at', 'تاریخ')]
     def get_update_url_pattern(self): return None
     def get_delete_url_pattern(self): return None
-    def get_detail_url_pattern(self): return 'management:purchase_detail'   # فعال کردن دکمه جزئیات
-    def get_create_url(self): return reverse_lazy('purchase_create')        # دکمه ثبت خرید جدید
+    def get_detail_url_pattern(self): return 'management:purchase_detail'
+    def get_create_url(self): return reverse_lazy('purchase_create')
+
 
 # ----- TaxRule -----
 class TaxRuleListView(BaseListView):
     model = TaxRule
     search_fields = ['name']
-    def get_list_columns(self): return [('name', 'نام'), ('calculation_type', 'نوع'), ('value', 'مقدار'), ('order', 'ترتیب')]
+    def get_list_columns(self):
+        return [('name', 'نام'), ('calculation_type', 'نوع'), ('value', 'مقدار'), ('order', 'ترتیب')]
     def get_create_url(self): return reverse_lazy('management:taxrule_create')
 
 class TaxRuleCreateView(BaseCreateView):
@@ -385,6 +291,7 @@ class TaxRuleUpdateView(BaseUpdateView):
 class TaxRuleDeleteView(BaseDeleteView):
     model = TaxRule
     success_url = reverse_lazy('management:taxrule_list')
+
 
 # ----- ProductTaxProfile -----
 class ProductTaxProfileListView(BaseListView):
@@ -406,11 +313,13 @@ class ProductTaxProfileDeleteView(BaseDeleteView):
     model = ProductTaxProfile
     success_url = reverse_lazy('management:producttaxprofile_list')
 
+
 # ----- Order -----
 class OrderListView(BaseListView):
     model = Order
     ordering = ['-created_at']
-    def get_list_columns(self): return [('id', 'شماره'), ('created_at', 'تاریخ'), ('grand_total', 'مبلغ'), ('is_paid', 'وضعیت')]
+    def get_list_columns(self):
+        return [('id', 'شماره'), ('created_at', 'تاریخ'), ('grand_total', 'مبلغ'), ('is_paid', 'وضعیت')]
     def get_update_url_pattern(self): return None
     def get_delete_url_pattern(self): return None
     def get_detail_url_pattern(self): return 'management:order_detail'
@@ -418,7 +327,6 @@ class OrderListView(BaseListView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         for row in context['table_rows']:
-            # اضافه کردن URL مستقیم (برای لینک کردن ستون شماره نیز مفید است)
             row['detail_url'] = reverse_lazy('management:order_detail', args=[row['object'].pk])
         return context
 
@@ -435,20 +343,18 @@ class OrderDetailView(BaseManagementView, DetailView):
         context['payments'] = self.object.payment_set.all()
         return context
 
+
 # ----- Payment -----
 class PaymentListView(BaseListView):
     model = Payment
     ordering = ['-paid_at']
-    def get_list_columns(self): return [('order', 'سفارش'), ('amount', 'مبلغ'), ('method', 'روش'), ('paid_at', 'تاریخ')]
+    def get_list_columns(self):
+        return [('order', 'سفارش'), ('amount', 'مبلغ'), ('method', 'روش'), ('paid_at', 'تاریخ')]
     def get_update_url_pattern(self): return None
     def get_delete_url_pattern(self): return None
 
 
-
-
-
-
-
+# ----- Purchase Detail & History -----
 class PurchaseDetailView(BaseManagementView, DetailView):
     model = Purchase
     template_name = 'management/purchase_detail.html'
@@ -506,25 +412,40 @@ class PurchaseItemUpdateView(BaseManagementView, UpdateView):
         new_price = purchase_item.unit_price
         product = purchase_item.product
 
+        # BUG FIX: اصلاح موجودی و inventory_cost به صورت صریح
+        # حذف اثر قدیمی
+        product.stock_quantity -= self.old_quantity
         product.inventory_cost -= self.old_quantity * self.old_price
+
+        # اضافه کردن اثر جدید
+        product.stock_quantity += new_quantity
+        product.inventory_cost += new_quantity * new_price
+
+        # جلوگیری از مقادیر منفی
+        if product.stock_quantity < 0:
+            product.stock_quantity = Decimal('0')
+        if product.inventory_cost < 0:
+            product.inventory_cost = Decimal('0')
+
+        product.save()
+
+        # ثبت گردش انبار
         StockMovement.objects.create(
             product=product,
             quantity=self.old_quantity,
             movement_type='out',
-            reference=f"Edit PurchaseItem #{purchase_item.pk}",
+            reference=f"Edit PurchaseItem #{purchase_item.pk} (old)",
         )
-
-        product.inventory_cost += new_quantity * new_price
-        product.save()
         StockMovement.objects.create(
             product=product,
             quantity=new_quantity,
             movement_type='in',
-            reference=f"Edit PurchaseItem #{purchase_item.pk}",
+            reference=f"Edit PurchaseItem #{purchase_item.pk} (new)",
         )
 
         purchase_item.save()
 
+        # به‌روزرسانی مبلغ کل فاکتور خرید
         purchase = purchase_item.purchase
         total = purchase.items.aggregate(
             total=Sum(F('quantity') * F('unit_price'))
@@ -556,8 +477,18 @@ class PurchaseItemDeleteView(BaseManagementView, DeleteView):
         product = purchase_item.product
         purchase = purchase_item.purchase
 
+        # BUG FIX: کاهش موجودی و inventory_cost به صورت صریح
         product.inventory_cost -= purchase_item.quantity * purchase_item.unit_price
+        product.stock_quantity -= purchase_item.quantity
+
+        # جلوگیری از مقادیر منفی
+        if product.stock_quantity < 0:
+            product.stock_quantity = Decimal('0')
+        if product.inventory_cost < 0:
+            product.inventory_cost = Decimal('0')
+
         product.save()
+
         StockMovement.objects.create(
             product=product,
             quantity=purchase_item.quantity,

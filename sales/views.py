@@ -33,21 +33,40 @@ def _parse_qty(value):
     return qty
 
 
+def _get_avg_cost(product):
+    """محاسبه میانگین موزون بهای تمام‌شده"""
+    if product.stock_quantity > 0:
+        return (product.inventory_cost / product.stock_quantity).quantize(
+            Decimal('1'), rounding=ROUND_HALF_UP
+        )
+    return product.purchase_price
+
+
 def recalc_cart(request):
     """بازگرداندن خلاصه سبد با احتساب تخفیف"""
     cart = request.session.get('cart', [])
     discount = request.session.get('discount', {'type': 'none', 'value': 0})
+
+    # BUG FIX: بارگذاری همه محصولات یکجا به جای query در هر iteration
+    product_ids = [item['product_id'] for item in cart]
+    products_map = {p.pk: p for p in Product.objects.filter(pk__in=product_ids)}
+
     subtotal = Decimal('0')
     total_tax = Decimal('0')
+
     for item in cart:
+        product = products_map.get(item['product_id'])
+        if not product:
+            continue
         qty = _parse_qty(item['quantity'])
         price = Decimal(str(item['unit_price']))
-        tax, _ = calculate_item_tax(price, qty, Product.objects.get(pk=item['product_id']))
+        tax, _ = calculate_item_tax(price, qty, product)
         item['tax'] = float(tax)
         subtotal += price * qty
         total_tax += tax
         if 'purchase_cost' not in item:
             item['purchase_cost'] = 0.0
+
     before_discount = subtotal + total_tax
     discount_amount = Decimal('0')
     if discount['type'] == 'percent':
@@ -100,16 +119,14 @@ def search_products(request):
     )[:10]
     results = []
     for p in products:
-        if p.stock_quantity > 0:
-            cost = (p.inventory_cost / p.stock_quantity).quantize(Decimal('1'), rounding=ROUND_HALF_UP)
-        else:
-            cost = p.purchase_price
+        cost = float(_get_avg_cost(p))
         results.append({
             'id': p.id,
             'name': str(p),
             'barcode': p.barcode,
             'price': float(p.selling_price),
-            'cost': float(cost)
+            'cost': cost,
+            'stock': float(p.stock_quantity),
         })
     return JsonResponse(results, safe=False)
 
@@ -134,12 +151,7 @@ def add_to_cart(request):
     else:
         return JsonResponse({'error': 'بارکد یا شناسه محصول الزامی است'}, status=400)
 
-    if product.stock_quantity > 0:
-        purchase_cost = float(
-            (product.inventory_cost / product.stock_quantity).quantize(Decimal('1'), rounding=ROUND_HALF_UP)
-        )
-    else:
-        purchase_cost = float(product.purchase_price)
+    purchase_cost = float(_get_avg_cost(product))
 
     cart = request.session.get('cart', [])
     found = False
@@ -193,11 +205,7 @@ def hold_order(request):
         qty = _parse_qty(item_data['quantity'])
         price = Decimal(str(item_data['unit_price']))
         tax, _ = calculate_item_tax(price, qty, product)
-
-        if product.stock_quantity > 0:
-            avg_cost = (product.inventory_cost / product.stock_quantity).quantize(Decimal('1'), rounding=ROUND_HALF_UP)
-        else:
-            avg_cost = product.purchase_price
+        avg_cost = _get_avg_cost(product)
 
         OrderItem.objects.create(
             order=order, product=product, quantity=qty, unit_price=price,
@@ -205,6 +213,7 @@ def hold_order(request):
         )
         subtotal += price * qty
         total_tax += tax
+
     before = subtotal + total_tax
     disc_amount = Decimal('0')
     if disc['type'] == 'percent':
@@ -250,7 +259,7 @@ def resume_held_order(request):
             'name': str(item.product),
             'barcode': item.product.barcode,
             'unit_price': float(item.unit_price),
-            'quantity': item.quantity,
+            'quantity': float(item.quantity),
             'purchase_cost': float(item.purchase_cost),
         })
     request.session['cart'] = cart
@@ -279,6 +288,7 @@ def checkout(request):
     cart = request.session.get('cart', [])
     if not cart:
         return JsonResponse({'error': 'سبد خالی است'}, status=400)
+
     data = json.loads(request.body)
     cash_amount = Decimal(str(data.get('cash_amount', 0)))
     card_amount = Decimal(str(data.get('card_amount', 0)))
@@ -286,14 +296,34 @@ def checkout(request):
     customer_id = data.get('customer_id')
     discount = request.session.get('discount', {'type': 'none', 'value': 0})
 
+    # BUG FIX: بررسی موجودی قبل از هر اقدامی
+    product_ids = [item['product_id'] for item in cart]
+    products_map = {p.pk: p for p in Product.objects.select_for_update().filter(pk__in=product_ids)}
+
+    for item_data in cart:
+        product = products_map.get(item_data['product_id'])
+        if not product:
+            return JsonResponse({'error': f'محصول یافت نشد'}, status=400)
+        try:
+            qty = _parse_qty(item_data['quantity'])
+        except ValueError:
+            return JsonResponse({'error': 'تعداد نامعتبر'}, status=400)
+        if product.stock_quantity < qty:
+            return JsonResponse(
+                {'error': f'موجودی «{product}» کافی نیست. موجودی فعلی: {product.stock_quantity}'},
+                status=400
+            )
+
     subtotal = Decimal('0')
     total_tax = Decimal('0')
     for item in cart:
+        product = products_map[item['product_id']]
         qty = _parse_qty(item['quantity'])
         price = Decimal(str(item['unit_price']))
-        tax, _ = calculate_item_tax(price, qty, Product.objects.get(pk=item['product_id']))
+        tax, _ = calculate_item_tax(price, qty, product)
         subtotal += price * qty
         total_tax += tax
+
     before_discount = subtotal + total_tax
     disc_amount = Decimal('0')
     if discount['type'] == 'percent':
@@ -331,15 +361,11 @@ def checkout(request):
     )
 
     for item_data in cart:
-        product = Product.objects.get(pk=item_data['product_id'])
+        product = products_map[item_data['product_id']]
         qty = _parse_qty(item_data['quantity'])
         price = Decimal(str(item_data['unit_price']))
         tax, tax_lines = calculate_item_tax(price, qty, product)
-
-        if product.stock_quantity > 0:
-            avg_cost = (product.inventory_cost / product.stock_quantity).quantize(Decimal('1'), rounding=ROUND_HALF_UP)
-        else:
-            avg_cost = product.purchase_price
+        avg_cost = _get_avg_cost(product)
 
         order_item = OrderItem.objects.create(
             order=order,
@@ -356,9 +382,12 @@ def checkout(request):
                 amount=line['amount']
             )
 
+        # BUG FIX: تغییر موجودی و inventory_cost به صورت صریح
         product.inventory_cost -= avg_cost * qty
+        product.stock_quantity -= qty
         product.save()
 
+        # ثبت گردش انبار بدون اعمال مجدد تغییر موجودی
         StockMovement.objects.create(
             product=product,
             quantity=qty,
@@ -439,12 +468,21 @@ def purchase_create(request):
         supplier_id = request.POST.get('supplier')
         supplier = get_object_or_404(Supplier, pk=supplier_id)
         item_count = int(request.POST.get('item_count', 0))
+
+        if item_count == 0:
+            return JsonResponse({'status': 'error', 'error': 'حداقل یک کالا الزامی است'})
+
         purchase = Purchase.objects.create(supplier=supplier, total_amount=0)
-        total = 0
+        total = Decimal('0')
+
         for i in range(item_count):
             product_id = request.POST.get(f'product_{i}')
             qty = int(request.POST.get(f'qty_{i}', 0))
             price = Decimal(request.POST.get(f'price_{i}', 0))
+
+            if qty <= 0 or price < 0:
+                continue
+
             product = get_object_or_404(Product, pk=product_id)
 
             purchase_item = PurchaseItem.objects.create(
@@ -452,16 +490,20 @@ def purchase_create(request):
             )
             total += price * qty
 
+            # BUG FIX: اعمال صریح تغییرات موجودی و ارزش انبار
             product.inventory_cost += qty * price
+            product.stock_quantity += qty
             product.purchase_price = price
             product.save()
 
+            # ثبت گردش انبار بدون اعمال مجدد تغییر موجودی
             StockMovement.objects.create(
                 product=product,
                 quantity=qty,
                 movement_type='in',
                 reference=f"Purchase #{purchase.id} Item #{purchase_item.id}"
             )
+
         purchase.total_amount = total
         purchase.save()
         return JsonResponse({'status': 'ok', 'purchase_id': purchase.id})
@@ -539,7 +581,6 @@ def daily_report(request):
     end_str = request.GET.get('end_date')
 
     today = timezone.localdate()
-    today_jalali = jdatetime.date.fromgregorian(date=today)
 
     try:
         if start_str:
@@ -881,7 +922,9 @@ def return_order(request, order_id):
         qty = item.quantity
         purchase_cost = item.purchase_cost
 
+        # BUG FIX: تغییر صریح موجودی
         product.inventory_cost += purchase_cost * qty
+        product.stock_quantity += qty
         product.save()
 
         StockMovement.objects.create(
@@ -935,7 +978,7 @@ def edit_order(request, order_id):
 
         for item_id_str, qty_str in zip(return_items, return_quantities):
             try:
-                qty_to_return = _parse_qty(qty_str)
+                qty_to_return = Decimal(str(qty_str))
             except (ValueError, TypeError):
                 continue
             if qty_to_return <= 0:
@@ -951,7 +994,10 @@ def edit_order(request, order_id):
                 return redirect('edit_order', order_id=order_id)
 
             product = original_item.product
+
+            # BUG FIX: تغییر صریح موجودی
             product.inventory_cost += original_item.purchase_cost * qty_to_return
+            product.stock_quantity += qty_to_return
             product.save()
 
             StockMovement.objects.create(
@@ -984,25 +1030,21 @@ def edit_order(request, order_id):
                 qty = _parse_qty(qty_str)
             except (ValueError, TypeError):
                 continue
-            if qty <= 0:
-                continue
 
             product = get_object_or_404(Product, pk=int(prod_id_str), is_active=True)
+
+            # BUG FIX: بررسی موجودی
             if product.stock_quantity < qty:
-                messages.error(request, f'موجودی {product} کافی نیست.')
+                messages.error(request, f'موجودی «{product}» کافی نیست. موجودی فعلی: {product.stock_quantity}')
                 return redirect('edit_order', order_id=order_id)
 
             price = product.selling_price
             tax, tax_lines = calculate_item_tax(price, qty, product)
+            avg_cost = _get_avg_cost(product)
 
-            if product.stock_quantity > 0:
-                avg_cost = (product.inventory_cost / product.stock_quantity).quantize(
-                    Decimal('1'), rounding=ROUND_HALF_UP
-                )
-            else:
-                avg_cost = product.purchase_price
-
+            # BUG FIX: تغییر صریح موجودی
             product.inventory_cost -= avg_cost * qty
+            product.stock_quantity -= qty
             product.save()
 
             StockMovement.objects.create(
