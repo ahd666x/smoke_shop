@@ -1,6 +1,6 @@
 {% extends 'sales/base.html' %}
 {% load humanize %}
-
+{% load custom_filters %}
 {% block title %}گزارش کالاهای کم‌موجود{% endblock %}
 
 {% block content %}
@@ -56,7 +56,7 @@
                         <tr>
                             <td>{{ product }}</td>
                             <td>{{ product.category.name }}</td>
-                            <td><span class="badge bg-danger">{{ product.stock_quantity }}</span></td>
+                            <td><span class="badge bg-danger">{{ product.stock_quantity|format_quantity }}</span></td>
                             <td>{{ product.avg_cost|floatformat:"0"|intcomma }}</td>
                             <td>{{ product.total_value|floatformat:"0"|intcomma }}</td>
                             <td>{{ product.selling_price|intcomma }}</td>
