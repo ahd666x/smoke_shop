@@ -3,6 +3,7 @@ import io
 from decimal import Decimal, ROUND_HALF_UP
 from datetime import datetime, timedelta, date
 
+from django.db.models.functions import TruncDate, TruncHour
 from django.shortcuts import render, get_object_or_404, redirect
 from django.http import JsonResponse, HttpResponse
 from django.contrib.auth.decorators import login_required
@@ -658,6 +659,57 @@ def daily_report(request):
     total_cost = cost_normal - cost_return
     gross_profit = total_sales - total_cost
 
+    # ── داده‌های نمودار: روزانه یا ساعتی ──
+    chart_labels = []
+    chart_values = []
+
+    if start_date == end_date:
+        # ── حالت تک‌روزه: فروش ساعتی ──
+        from collections import OrderedDict
+        hourly_qs = Order.objects.filter(
+            created_at__date=start_date,
+            is_paid=True
+        ).annotate(
+            hour=TruncHour('created_at')
+        ).values('hour').annotate(
+            gross=Sum(F('subtotal') - F('discount_amount'), filter=Q(is_return=False)),
+            returns=Sum(F('subtotal') - F('discount_amount'), filter=Q(is_return=True))
+        ).order_by('hour')
+
+        # ساخت یک دیکشنری از ساعت (۰-۲۳) به فروش خالص
+        hour_map = {h: Decimal('0') for h in range(24)}
+        for entry in hourly_qs:
+            h = entry['hour'].hour if entry['hour'] else 0
+            net = (entry['gross'] or 0) - (entry['returns'] or 0)
+            hour_map[h] += net
+
+        # تولید برچسب فارسی برای هر ساعت (فقط ساعاتی که فروش دارند یا همیشه ۰ تا ۲۳)
+        # اما بهتر است همه ۲۴ ساعت را نشان دهیم تا روند صفرها هم مشخص باشد
+        for h in range(24):
+            chart_labels.append(f"{h:02d}:00")   # می‌توان با jdatetime شمسی کرد ولی همین کافی است
+            chart_values.append(float(hour_map[h]))
+    else:
+        # ── حالت بازه‌ای: فروش روزانه ──
+        daily_sales_qs = Order.objects.filter(
+            created_at__date__gte=start_date,
+            created_at__date__lte=end_date,
+            is_paid=True
+        ).annotate(
+            day=TruncDate('created_at')
+        ).values('day').annotate(
+            gross=Sum(F('subtotal') - F('discount_amount'), filter=Q(is_return=False)),
+            returns=Sum(F('subtotal') - F('discount_amount'), filter=Q(is_return=True))
+        ).order_by('day')
+
+        for entry in daily_sales_qs:
+            gregorian_date = entry['day']
+            if gregorian_date:
+                net = (entry['gross'] or 0) - (entry['returns'] or 0)
+                j_date = jdatetime.date.fromgregorian(date=gregorian_date)
+                chart_labels.append(j_date.strftime('%Y/%m/%d'))
+                chart_values.append(float(net))
+
+    # ── پردازش آیتم‌های فروش به تفکیک کالا ──
     normal_items = OrderItem.objects.filter(
         order__created_at__date__gte=start_date,
         order__created_at__date__lte=end_date,
@@ -725,8 +777,11 @@ def daily_report(request):
         'order_count': order_count,
         'gross_profit': gross_profit,
         'product_sales': product_sales_list,
+        'chart_labels_json': json.dumps(chart_labels, ensure_ascii=False),
+        'chart_values_json': json.dumps(chart_values),
     }
     return render(request, 'sales/daily_report.html', context)
+
 
 
 @login_required

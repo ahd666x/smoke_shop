@@ -6,279 +6,317 @@
 <html lang="fa" dir="rtl">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>گزارش بازه‌ای — {{ display_start }} تا {{ display_end }}</title>
 
     <link rel="stylesheet" href="{% static 'css/bootstrap.min.css' %}">
 
     <style>
-        /* ===== استایل‌های تقویم شمسی (همان ساختار ارسالی) ===== */
+        :root {
+            --bg-main: #f8fafc;
+            --border-color: #f1f5f9;
+            --text-muted: #64748b;
+            --primary-color: #0d6efd;
+        }
+        body { 
+            background: var(--bg-main); 
+            font-family: 'Vazir', Tahoma, sans-serif; 
+            color: #1e293b;
+        }
+        .card-minimal {
+            background: #ffffff;
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.02), 0 2px 4px -2px rgb(0 0 0 / 0.02);
+        }
+        .form-control-minimal {
+            border: 1px solid #e2e8f0;
+            border-radius: 10px;
+            padding: 0.6rem 1rem;
+            background-color: #fff;
+            transition: all 0.2s ease;
+        }
+        .form-control-minimal:focus {
+            border-color: #cbd5e1;
+            box-shadow: none;
+        }
+        .btn-minimal {
+            border-radius: 10px;
+            padding: 0.6rem 1.2rem;
+            font-weight: 500;
+            transition: all 0.2s ease;
+        }
+
+        /* ===== استایل‌های تقویم شمسی مینیمال ===== */
         .picker-wrap { position: relative; }
         .picker-wrap .picker-icon {
-            position: absolute; left: 10px; top: 50%; transform: translateY(-50%);
-            color: #6c757d; pointer-events: none; font-size: .9rem;
+            position: absolute; left: 12px; top: 50%; transform: translateY(-50%);
+            color: var(--text-muted); pointer-events: none; font-size: .95rem;
         }
-        .picker-wrap input {
-            padding-left: 32px;
-            cursor: pointer;
-            background-color: #fff;
-        }
+        .picker-wrap input { padding-left: 35px; cursor: pointer; }
+        
         .jcal-popup {
-            display: none;
-            position: fixed;
-            z-index: 9999;
-            background: #fff;
-            border: 1px solid #dee2e6;
-            border-radius: 14px;
-            box-shadow: 0 8px 28px rgba(0,0,0,.14);
-            padding: 12px;
-            min-width: 260px;
-            font-family: inherit;
-            direction: rtl;
+            display: none; position: fixed; z-index: 9999; background: #fff;
+            border: 1px solid var(--border-color); border-radius: 16px;
+            box-shadow: 0 10px 25px -5px rgb(0 0 0 / 0.1); padding: 14px;
+            min-width: 270px; direction: rtl;
         }
         .jcal-popup.open { display: block; }
-
-        .jcal-header {
-            display: flex; align-items: center; justify-content: space-between;
-            margin-bottom: 8px;
-        }
-        .jcal-header button {
-            background: none; border: none; cursor: pointer;
-            color: #495057; font-size: 1rem; padding: 4px 8px;
-            border-radius: 8px;
-        }
+        .jcal-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+        .jcal-header button { background: none; border: none; cursor: pointer; color: #495057; font-size: 1.1rem; padding: 4px 10px; border-radius: 8px; }
         .jcal-header button:hover { background: #f1f3f5; }
-        .jcal-title {
-            font-weight: 700; font-size: .9rem; cursor: pointer;
-            padding: 4px 10px; border-radius: 8px;
-        }
+        .jcal-title { font-weight: 700; font-size: .9rem; cursor: pointer; padding: 4px 12px; border-radius: 8px; }
         .jcal-title:hover { background: #f1f3f5; }
+        .jcal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 3px; }
+        .jcal-dow { text-align: center; font-size: .75rem; font-weight: 600; color: #adb5bd; padding: 4px 0; }
+        .jcal-day { text-align: center; font-size: .85rem; padding: 7px 2px; border-radius: 8px; cursor: pointer; transition: .15s; }
+        .jcal-day:hover { background: #e9ecef; }
+        .jcal-day.today { color: var(--primary-color); font-weight: 700; }
+        .jcal-day.selected { background: var(--primary-color); color: #fff !important; }
+        .jcal-day.other-month { color: #ced4da; }
+        .jcal-day.empty { cursor: default; }
+        .jcal-month-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+        .jcal-month-btn { background: none; border: 1px solid transparent; border-radius: 8px; padding: 8px 4px; font-size: .8rem; cursor: pointer; text-align: center; }
+        .jcal-month-btn:hover { background: #e9ecef; }
+        .jcal-month-btn.selected { background: var(--primary-color); color: #fff; }
+        .jcal-year-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; max-height: 160px; overflow-y: auto; }
+        .jcal-year-btn { background: none; border: 1px solid transparent; border-radius: 8px; padding: 6px 2px; font-size: .8rem; cursor: pointer; text-align: center; }
+        .jcal-year-btn:hover { background: #e9ecef; }
+        .jcal-year-btn.selected { background: var(--primary-color); color: #fff; }
 
-        .jcal-grid {
-            display: grid;
-            grid-template-columns: repeat(7, 1fr);
-            gap: 2px;
+        /* ===== کارت‌های KPI مینیمال ===== */
+        .kpi-card-minimal {
+            background: #ffffff;
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            padding: 24px;
+            box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.02);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
         }
-        .jcal-dow {
-            text-align: center; font-size: .72rem; font-weight: 600;
-            color: #adb5bd; padding: 4px 0;
+        .kpi-content { display: flex; flex-direction: column; }
+        .kpi-title { font-size: 0.85rem; color: var(--text-muted); font-weight: 500; margin-bottom: 6px; }
+        .kpi-number { font-size: 1.75rem; font-weight: 800; color: #0f172a; line-height: 1; }
+        .kpi-badge-icon {
+            width: 48px; height: 48px; border-radius: 12px;
+            display: flex; align-items: center; justify-content: center; font-size: 1.3rem;
         }
-        .jcal-day {
-            text-align: center; font-size: .82rem;
-            padding: 6px 2px; border-radius: 8px; cursor: pointer;
-            transition: .15s;
-        }
-        .jcal-day:hover        { background: #e9ecef; }
-        .jcal-day.today        { color: #0d6efd; font-weight: 700; }
-        .jcal-day.selected     { background: #0d6efd; color: #fff !important; }
-        .jcal-day.other-month  { color: #ced4da; }
-        .jcal-day.empty        { cursor: default; }
 
-        .jcal-month-grid {
-            display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px;
+        /* جدول‌ها */
+        .table-minimal th {
+            background-color: #fafafa !important;
+            color: var(--text-muted);
+            font-weight: 600;
+            font-size: 0.85rem;
+            border-bottom: 1px solid var(--border-color) !important;
+            padding: 12px 16px;
         }
-        .jcal-month-btn {
-            background: none; border: 1px solid transparent;
-            border-radius: 8px; padding: 6px 4px;
-            font-size: .8rem; cursor: pointer; text-align: center;
-            transition: .15s;
+        .table-minimal td {
+            padding: 14px 16px;
+            font-size: 0.9rem;
+            border-bottom: 1px solid var(--border-color);
         }
-        .jcal-month-btn:hover    { background: #e9ecef; }
-        .jcal-month-btn.selected { background: #0d6efd; color: #fff; border-color: #0d6efd; }
-
-        .jcal-year-grid {
-            display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px;
-            max-height: 160px; overflow-y: auto;
-        }
-        .jcal-year-btn {
-            background: none; border: 1px solid transparent;
-            border-radius: 8px; padding: 5px 2px;
-            font-size: .8rem; cursor: pointer; text-align: center;
-            transition: .15s;
-        }
-        .jcal-year-btn:hover    { background: #e9ecef; }
-        .jcal-year-btn.selected { background: #0d6efd; color: #fff; border-color: #0d6efd; }
-
-        /* ===== استایل‌های گزارش ===== */
-        @media print {
-            .no-print { display: none !important; }
-            body { font-size: 14px; }
-        }
-        .card-stats { border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
     </style>
 </head>
-<body class="bg-light">
-    <div class="container mt-4">
-        <div class="d-flex justify-content-between align-items-center mb-4 no-print">
-            <h2>گزارش بازه‌ای</h2>
+<body>
+    <div class="container py-4">
+        
+        <!-- هدر گزارش -->
+        <div class="d-flex justify-content-between align-items-center mb-4 pb-3 border-bottom">
             <div>
-                <a href="{% url 'dashboard' %}" class="btn btn-secondary">داشبورد</a>
-                <button onclick="window.print()" class="btn btn-outline-primary">🖨️ چاپ / PDF</button>
+                <h4 class="fw-bold m-0">📊 گزارش بازه‌ای عملکرد</h4>
+                <small class="text-muted">مشاهده فاکتورها، سود و روند فروش مابین تواریخ انتخابی</small>
+            </div>
+            <div class="d-flex gap-2">
+                <a href="{% url 'dashboard' %}" class="btn btn-minimal btn-outline-secondary btn-sm px-3">داشبورد</a>
+                <button onclick="window.print()" class="btn btn-minimal btn-dark btn-sm px-3">🖨️ چاپ / نسخه PDF</button>
             </div>
         </div>
 
-        <!-- فرم انتخاب بازهٔ شمسی با تقویم اختصاصی -->
-        <form method="get" class="row g-2 mb-4 no-print align-items-end">
-            <div class="col-auto">
-                <label class="form-label">از تاریخ</label>
-                <div class="picker-wrap">
-                    <i class="bi bi-calendar3 picker-icon">📅</i>
-                    <input type="text" id="inp_date_from" name="date_from_display"
-                           class="form-control jcal-input" autocomplete="off"
-                           placeholder="۱۴۰۳/۰۱/۰۱" readonly>
-                    <div class="jcal-popup" id="jcal_from"></div>
+        <!-- فرم فیلتر تاریخ -->
+        <div class="card card-minimal p-4 mb-4">
+            <form method="get" class="row g-3 align-items-end">
+                <div class="col-lg-4 col-md-5 col-12">
+                    <label class="form-label small fw-bold text-secondary">از تاریخ</label>
+                    <div class="picker-wrap">
+                        <i class="bi bi-calendar3 picker-icon">📅</i>
+                        <input type="text" id="inp_date_from" name="date_from_display"
+                               class="form-control form-control-minimal jcal-input" autocomplete="off"
+                               placeholder="۱۴۰۳/۰۱/۰۱" readonly>
+                        <div class="jcal-popup" id="jcal_from"></div>
+                    </div>
+                    <input type="hidden" name="start_date" id="hid_date_from" value="{{ input_start }}">
                 </div>
-                <input type="hidden" name="start_date" id="hid_date_from" value="{{ input_start }}">
-            </div>
 
-            <div class="col-auto">
-                <label class="form-label">تا تاریخ</label>
-                <div class="picker-wrap">
-                    <i class="bi bi-calendar3 picker-icon">📅</i>
-                    <input type="text" id="inp_date_to" name="date_to_display"
-                           class="form-control jcal-input" autocomplete="off"
-                           placeholder="۱۴۰۳/۰۱/۰۱" readonly>
-                    <div class="jcal-popup" id="jcal_to"></div>
+                <div class="col-lg-4 col-md-5 col-12">
+                    <label class="form-label small fw-bold text-secondary">تا تاریخ</label>
+                    <div class="picker-wrap">
+                        <i class="bi bi-calendar3 picker-icon">📅</i>
+                        <input type="text" id="inp_date_to" name="date_to_display"
+                               class="form-control form-control-minimal jcal-input" autocomplete="off"
+                               placeholder="۱۴۰۳/۰۱/۰۱" readonly>
+                        <div class="jcal-popup" id="jcal_to"></div>
+                    </div>
+                    <input type="hidden" name="end_date" id="hid_date_to" value="{{ input_end }}">
                 </div>
-                <input type="hidden" name="end_date" id="hid_date_to" value="{{ input_end }}">
-            </div>
 
-            <div class="col-auto">
-                <button type="submit" class="btn btn-primary">نمایش</button>
-            </div>
-            <div class="col-auto">
-                <a href="{% url 'daily_report' %}" class="btn btn-outline-secondary">امروز</a>
-            </div>
-        </form>
+                <div class="col-lg-4 col-md-2 col-12 d-flex gap-2">
+                    <button type="submit" class="btn btn-minimal btn-primary px-4 w-100">نمایش گزارش</button>
+                    <a href="{% url 'daily_report' %}" class="btn btn-minimal btn-outline-secondary px-3">امروز</a>
+                </div>
+            </form>
+        </div>
 
-        <!-- کارت‌های آماری -->
-        <div class="row g-3 mb-5">
-            <div class="col-md-3">
-                <div class="card card-stats bg-primary text-white">
-                    <div class="card-body">
-                        <h5 class="card-title">فروش خالص</h5>
-                        <p class="card-text fs-4">{{ total_sales|floatformat:"0"|intcomma }} تومان</p>
+        <!-- کارت‌های شاخص عملکرد KPI -->
+        <div class="row g-3 mb-4">
+            <div class="col-md-4 col-12">
+                <div class="kpi-card-minimal">
+                    <div class="kpi-content">
+                        <span class="kpi-title">فروش خالص</span>
+                        <strong class="kpi-number text-success">{{ total_sales|floatformat:"0"|intcomma }} <span class="fs-6 fw-normal text-muted">تومان</span></strong>
                     </div>
+                    <div class="kpi-badge-icon bg-success bg-opacity-10 text-success">💰</div>
                 </div>
             </div>
-            <div class="col-md-3">
-                <div class="card card-stats bg-success text-white">
-                    <div class="card-body">
-                        <h5 class="card-title">سود ناخالص</h5>
-                        <p class="card-text fs-4">{{ gross_profit|floatformat:"0"|intcomma }} تومان</p>
+            <div class="col-md-4 col-12">
+                <div class="kpi-card-minimal">
+                    <div class="kpi-content">
+                        <span class="kpi-title">سود ناخالص</span>
+                        <strong class="kpi-number text-primary">{{ gross_profit|floatformat:"0"|intcomma }} <span class="fs-6 fw-normal text-muted">تومان</span></strong>
                     </div>
+                    <div class="kpi-badge-icon bg-primary bg-opacity-10 text-primary">📈</div>
                 </div>
             </div>
-            <div class="col-md-3">
-                <div class="card card-stats bg-warning text-dark">
-                    <div class="card-body">
-                        <h5 class="card-title">مالیات</h5>
-                        <p class="card-text fs-4">{{ total_tax|floatformat:"0"|intcomma }} تومان</p>
+            <div class="col-md-4 col-12">
+                <div class="kpi-card-minimal">
+                    <div class="kpi-content">
+                        <span class="kpi-title">تعداد کل فاکتورها</span>
+                        <strong class="kpi-number text-dark">{{ order_count }}</strong>
                     </div>
-                </div>
-            </div>
-            <div class="col-md-3">
-                <div class="card card-stats bg-info text-white">
-                    <div class="card-body">
-                        <h5 class="card-title">تعداد فاکتور</h5>
-                        <p class="card-text fs-4">{{ order_count }}</p>
-                    </div>
+                    <div class="kpi-badge-icon bg-dark bg-opacity-10 text-dark">📋</div>
                 </div>
             </div>
         </div>
 
-        <!-- لیست فاکتورها -->
-        <h3>فاکتورهای {{ display_start }} تا {{ display_end }}</h3>
-        {% if orders %}
-        <div class="table-responsive">
-            <table class="table table-striped">
-                <thead class="table-dark">
-                    <tr>
-                        <th>شماره</th>
-                        <th>تاریخ</th>
-                        <th>ساعت</th>
-                        <th>مشتری</th>
-                        <th>مبلغ کل (تومان)</th>
-                        <th>جزئیات</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for order in orders %}
-                    <tr>
-                        <td>{{ order.id }}</td>
-                        <td>{{ order.created_at|jalali_date:"%Y/%m/%d" }}</td>
-                        <td>{{ order.created_at|jalali_date:"%H:%M" }}</td>
-                        <td>{{ order.customer.name|default:"عمومی" }}</td>
-                        <td>{{ order.grand_total|floatformat:"0"|intcomma }}</td>
-                        <td>
-                            <button class="btn btn-sm btn-outline-secondary" type="button" data-bs-toggle="collapse" data-bs-target="#items-{{ order.id }}">
-                                مشاهده
-                            </button>
-                        </td>
-                    </tr>
-                    <tr class="collapse" id="items-{{ order.id }}">
-                        <td colspan="6">
-                            <table class="table table-sm mb-0">
-                                <thead>
-                                    <tr><th>کالا</th><th>تعداد</th><th>فی</th><th>مالیات</th><th>جمع</th></tr>
-                                </thead>
-                                <tbody>
-                                    {% for item in order.items.all %}
-                                    <tr>
-                                        <td>{{ item.product }}</td>
-                                        <td>{{ item.quantity|format_quantity }}</td>
-                                        <td>{{ item.unit_price|floatformat:"0"|intcomma }}</td>
-                                        <td>{{ item.tax_amount|floatformat:"0"|intcomma }}</td>
-                                        <td>{{ item.row_total|floatformat:"0"|intcomma }}</td>
-                                    </tr>
-                                    {% endfor %}
-                                </tbody>
-                            </table>
-                        </td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
+        <!-- نمودار روند فروش -->
+        <div class="card card-minimal p-4 mb-4">
+            <h6 class="fw-bold mb-3 text-secondary">📊 روند فروش در بازه انتخابی</h6>
+            <div>
+                <canvas id="salesChart" height="90"></canvas>
+            </div>
         </div>
-        {% else %}
-        <div class="alert alert-info">هیچ فاکتوری در این بازه ثبت نشده است.</div>
-        {% endif %}
+
+        <!-- بخش لیست فاکتورها -->
+        <div class="card card-minimal p-4 mb-4">
+            <h5 class="fw-bold mb-3 text-dark">فاکتورهای صادر شده</h5>
+            <p class="text-muted small mb-4">لیست کلیه فاکتورهای ثبت شده از تاریخ {{ display_start }} تا {{ display_end }}</p>
+            
+            {% if orders %}
+            <div class="table-responsive">
+                <table class="table table-minimal table-hover align-middle mb-0">
+                    <thead>
+                        <tr>
+                            <th>شماره فاکتور</th>
+                            <th>تاریخ ثبت</th>
+                            <th>ساعت</th>
+                            <th>نام مشتری</th>
+                            <th>مبلغ کل (تومان)</th>
+                            <th>عملیات</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for order in orders %}
+                        <tr>
+                            <td class="fw-bold">#{{ order.id }}</td>
+                            <td>{{ order.created_at|jalali_date:"%Y/%m/%d" }}</td>
+                            <td class="text-secondary">{{ order.created_at|jalali_date:"%H:%M" }}</td>
+                            <td>{{ order.customer.name|default:"مشتری عمومی" }}</td>
+                            <td class="fw-bold text-dark">{{ order.grand_total|floatformat:"0"|intcomma }}</td>
+                            <td>
+                                <button class="btn btn-sm btn-outline-secondary rounded-3" type="button" data-bs-toggle="collapse" data-bs-target="#items-{{ order.id }}">
+                                    مشاهده اقلام
+                                </button>
+                            </td>
+                        </tr>
+                        <!-- بخش ساب‌تیبل جزئیات فاکتور -->
+                        <tr class="collapse" id="items-{{ order.id }}">
+                            <td colspan="6" class="bg-light p-3">
+                                <div class="card card-minimal p-3 m-1">
+                                    <table class="table table-sm table-borderless align-middle mb-0">
+                                        <thead>
+                                            <tr class="text-muted border-bottom small">
+                                                <th>نام کالا</th>
+                                                <th>تعداد</th>
+                                                <th>فی (تومان)</th>
+                                                <th>مالیات</th>
+                                                <th>جمع ردیف (تومان)</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {% for item in order.items.all %}
+                                            <tr class="small">
+                                                <td class="fw-bold">{{ item.product }}</td>
+                                                <td>{{ item.quantity|format_quantity }}</td>
+                                                <td>{{ item.unit_price|floatformat:"0"|intcomma }}</td>
+                                                <td class="text-muted">{{ item.tax_amount|floatformat:"0"|intcomma }}</td>
+                                                <td class="fw-bold">{{ item.row_total|floatformat:"0"|intcomma }}</td>
+                                            </tr>
+                                            {% endfor %}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <div class="alert alert-light border text-center text-muted p-4 py-5 m-0 rounded-4">هیچ فاکتوری در این بازه زمانی ثبت نشده است.</div>
+            {% endif %}
+        </div>
 
         <!-- فروش بر اساس کالا -->
-        <h3 class="mt-5">فروش بر اساس کالا</h3>
-        {% if product_sales %}
-        <div class="table-responsive">
-            <table class="table table-bordered">
-                <thead class="table-light">
-                    <tr>
-                        <th>کالا</th>
-                        <th>تعداد فروخته شده</th>
-                        <th>فروش کل (تومان)</th>
-                        <th>سود (تومان)</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for item in product_sales %}
-                    <tr>
-                        <td>{{ item.product }}</td>
-                        <td>{{ item.quantity|format_quantity }}</td>
-                        <td>{{ item.total_sales|floatformat:"0"|intcomma }}</td>
-                        <td>{{ item.profit|floatformat:"0"|intcomma }}</td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
+        <div class="card card-minimal p-4">
+            <h5 class="fw-bold mb-3 text-dark">فروش بر اساس کالا</h5>
+            <p class="text-muted small mb-4">مجموع عملکرد فروش و سوددهی هر کالا به تفکیک</p>
+            
+            {% if product_sales %}
+            <div class="table-responsive">
+                <table class="table table-minimal table-hover align-middle mb-0">
+                    <thead>
+                        <tr>
+                            <th>نام کالا</th>
+                            <th>تعداد فروخته شده</th>
+                            <th>فروش کل (تومان)</th>
+                            <th>سود ناخالص (تومان)</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for item in product_sales %}
+                        <tr>
+                            <td class="fw-bold">{{ item.product }}</td>
+                            <td><span class="badge bg-light text-dark border px-2.5 py-1.5">{{ item.quantity|format_quantity }}</span></td>
+                            <td class="fw-bold">{{ item.total_sales|floatformat:"0"|intcomma }}</td>
+                            <td class="text-success fw-bold">{{ item.profit|floatformat:"0"|intcomma }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <div class="alert alert-light border text-center text-muted p-4 py-5 m-0 rounded-4">آماری جهت نمایش فروش کالا در این بازه وجود ندارد.</div>
+            {% endif %}
         </div>
-        {% else %}
-        <div class="alert alert-secondary">فروش کالایی در این بازه ثبت نشده.</div>
-        {% endif %}
     </div>
 
     <script src="{% static 'js/bootstrap.bundle.min.js' %}"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 
     <!-- ==================== تقویم شمسی اختصاصی ==================== -->
     <script>
     (function () {
-        /* ── تبدیل میلادی ↔ شمسی (الگوریتم jalaali-js) ── */
         function toJalali(gy, gm, gd) {
             var g_d_no, j_d_no, j_np, i, j_y, j_m, j_d;
             var g_days_in_month = [31,28,31,30,31,30,31,31,30,31,30,31];
@@ -327,9 +365,8 @@
 
         var J_MONTHS = ['فروردین','اردیبهشت','خرداد','تیر','مرداد','شهریور',
                         'مهر','آبان','آذر','دی','بهمن','اسفند'];
-        var J_DOW    = ['ش','ی','د','س','چ','پ','ج'];  // شنبه اول
+        var J_DOW    = ['ش','ی','د','س','چ','پ','ج'];
 
-        /* ── کلاس تقویم ── */
         function JCalendar(inputEl, popupEl, hiddenEl) {
             var self   = this;
             var today  = toJalali(new Date().getFullYear(), new Date().getMonth()+1, new Date().getDate());
@@ -337,7 +374,6 @@
             var mode   = 'day';
             var chosen = null;
 
-            // مقدار اولیه از input
             var init = inputEl.value;
             if(init) {
                 var parts = init.split('/');
@@ -379,7 +415,7 @@
             function renderDays() {
                 var gFirst = toGregorian(cur.y, cur.m, 1);
                 var dow = new Date(gFirst.y, gFirst.m-1, gFirst.d).getDay();
-                dow = (dow + 1) % 7; // شنبه=0
+                dow = (dow + 1) % 7;
 
                 var dim = jDaysInMonth(cur.m, cur.y);
                 var html = '<div class="jcal-header">';
@@ -405,7 +441,6 @@
                     el.onclick = function(){
                         chosen = { y: cur.y, m: cur.m, d: +this.dataset.d };
                         inputEl.value = chosen.y + '/' + pad(chosen.m) + '/' + pad(chosen.d);
-                        // به‌روزرسانی فیلد مخفی میلادی
                         var g = toGregorian(chosen.y, chosen.m, chosen.d);
                         hiddenEl.value = g.y + '-' + pad(g.m) + '-' + pad(g.d);
                         self.close();
@@ -451,8 +486,7 @@
             }
         }
 
-        // مقدار اولیه از سرور
-        var initStart = "{{ display_start }}";  // مثال "۱۴۰۴/۰۴/۰۴"
+        var initStart = "{{ display_start }}";
         var initEnd   = "{{ display_end }}";
 
         var inpFrom = document.getElementById('inp_date_from');
@@ -465,6 +499,58 @@
 
         new JCalendar(inpFrom, document.getElementById('jcal_from'), hidFrom);
         new JCalendar(inpTo,   document.getElementById('jcal_to'),   hidTo);
+    })();
+    </script>
+
+    <!-- ==================== نمودار فروش ==================== -->
+    <script>
+    (function () {
+        const labels = {{ chart_labels_json|default:"[]"|safe }};
+        const values = {{ chart_values_json|default:"[]"|safe }};
+        if (labels.length && values.length) {
+            new Chart(document.getElementById('salesChart'), {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        type: 'line',
+                        label: 'روند تغییرات',
+                        data: values,
+                        borderColor: '#0d6efd',
+                        backgroundColor: 'transparent',
+                        tension: 0.35,
+                        pointRadius: 4,
+                        pointHoverRadius: 6,
+                        yAxisID: 'y',
+                        order: 1
+                    }, {
+                        type: 'bar',
+                        label: 'حجم فروش',
+                        data: values,
+                        backgroundColor: 'rgba(13,110,253,0.08)',
+                        borderRadius: 8,
+                        yAxisID: 'y',
+                        order: 2
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    interaction: { mode: 'index', intersect: false },
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            grid: { color: '#f1f5f9' },
+                            ticks: { callback: v => v.toLocaleString('fa-IR'), font: { family: 'Vazir, Tahoma' } }
+                        },
+                        x: {
+                            grid: { display: false },
+                            ticks: { font: { family: 'Vazir, Tahoma' } }
+                        }
+                    }
+                }
+            });
+        }
     })();
     </script>
 </body>

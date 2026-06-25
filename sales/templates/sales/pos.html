@@ -3,136 +3,206 @@
 <html lang="fa" dir="rtl">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>صندوق فروش</title>
-    <link rel="stylesheet" href="{% static 'css/bootstrap.min.css' %}">
+    <link class="styles" rel="stylesheet" href="{% static 'css/bootstrap.min.css' %}">
     <style>
-        body { background: #f4f6f9; font-family: 'Vazir', Tahoma, sans-serif; }
-        .navbar { background: #1e293b; }
-        .navbar-brand { font-weight: bold; letter-spacing: 1px; }
-        .card { border: none; border-radius: 15px; box-shadow: 0 0.125rem 0.25rem rgba(0,0,0,.075); }
-        .btn-primary { background-color: #3b82f6; border-color: #3b82f6; }
-        .btn-primary:hover { background-color: #2563eb; }
-        .btn-success { background-color: #10b981; border-color: #10b981; }
-        .btn-success:hover { background-color: #059669; }
-        .quantity-btn { min-width: 32px; font-weight: bold; }
-        #cart-table th { background-color: #f1f5f9; font-weight: 600; }
-        #cart-table td { vertical-align: middle; }
-        .tooman { font-size: 0.85rem; color: #64748b; }
-        .held-card {
+        :root {
+            --bg-main: #f8fafc;
+            --border-color: #f1f5f9;
+            --text-muted: #64748b;
+            --accent-color: #0f172a;
+        }
+        body { 
+            background: var(--bg-main); 
+            font-family: 'Vazir', Tahoma, sans-serif; 
+            color: #1e293b;
+        }
+        .navbar-minimal {
+            background: #ffffff;
+            border-bottom: 1px solid var(--border-color);
+        }
+        .card-minimal {
+            background: #ffffff;
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.02), 0 2px 4px -2px rgb(0 0 0 / 0.02);
+        }
+        .form-control-minimal {
             border: 1px solid #e2e8f0;
+            border-radius: 10px;
+            padding: 0.6rem 1rem;
+            background-color: #f8fafc;
+            transition: all 0.2s ease;
+        }
+        .form-control-minimal:focus {
+            background-color: #fff;
+            border-color: #cbd5e1;
+            box-shadow: none;
+        }
+        .btn-minimal {
+            border-radius: 10px;
+            padding: 0.6rem 1.2rem;
+            font-weight: 500;
+            transition: all 0.2s ease;
+        }
+        .quantity-btn { 
+            width: 32px; 
+            height: 32px; 
+            display: inline-flex; 
+            align-items: center; 
+            justify-content: center; 
+            border-radius: 8px !important;
+        }
+        #cart-table th { 
+            background-color: #f8fafc; 
+            color: var(--text-muted);
+            font-weight: 600; 
+            border-bottom: 2px solid var(--border-color);
+        }
+        #cart-table td { vertical-align: middle; }
+        .held-card {
+            border: 1px solid var(--border-color);
             border-radius: 12px;
             background: #fff;
-            transition: box-shadow 0.2s;
+            transition: all 0.2s;
         }
-        .held-card:hover { box-shadow: 0 4px 12px rgba(0,0,0,0.08); }
+        .held-card:hover { transform: translateY(-2px); box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.05); }
         .tooltip-inner { text-align: right; }
     </style>
 </head>
 <body>
 
-<!-- نوار بالایی -->
-<nav class="navbar navbar-dark mb-4">
-    <div class="container-fluid">
-        <a class="navbar-brand" href="{% url 'home' %}">🏪 فروشگاه دخانیات</a>
-        <div class="d-flex">
-            <a href="{% url 'dashboard' %}" class="btn btn-outline-light btn-sm me-2">📊 داشبورد</a>
-            <a href="{% url 'home' %}" class="btn btn-outline-light btn-sm">🏠 خانه</a>
+<!-- نوار بالایی مینیمال -->
+<nav class="navbar navbar-minimal mb-4 py-3">
+    <div class="container-fluid px-4">
+        <a class="navbar-brand text-dark fw-bold m-0 fs-5" href="{% url 'home' %}">🏪 فروشگاه دخانیات</a>
+        <div class="d-flex gap-2">
+            <a href="{% url 'dashboard' %}" class="btn btn-minimal btn-outline-secondary btn-sm px-3">📊 داشبورد</a>
+            <a href="{% url 'home' %}" class="btn btn-minimal btn-outline-secondary btn-sm px-3">🏠 خانه</a>
         </div>
     </div>
 </nav>
 
-<div class="container-fluid">
-    <!-- جستجو و اسکن -->
-    <div class="card mb-3 p-3">
-        <div class="input-group mb-3">
-            <span class="input-group-text bg-white">🔍</span>
-            <input type="text" id="barcode" class="form-control form-control-lg" placeholder="اسکن بارکد...">
-        </div>
-        <div class="input-group">
-            <input type="text" id="search-input" class="form-control" placeholder="جستجوی نام یا بارکد...">
-            <button class="btn btn-primary" onclick="searchProducts()">جستجو</button>
-        </div>
-        <ul id="search-results" class="list-group position-absolute w-100 mt-1" style="z-index:1000; display:none;"></ul>
-    </div>
-
-    <!-- سبد خرید -->
-    <div class="card p-3 mb-3">
-        <h4>🛒 سبد خرید</h4>
-        <div class="table-responsive">
-            <table class="table table-hover" id="cart-table">
-                <thead>
-                    <tr><th>کالا</th><th>تعداد</th><th>فی (تومان)</th><th>جمع (تومان)</th><th></th></tr>
-                </thead>
-                <tbody></tbody>
-            </table>
-        </div>
-
-        <div class="row mt-3 align-items-center">
-            <div class="col-md-4">
+<div class="container-fluid px-4">
+    <div class="row g-4">
+        
+        <!-- ستون سمت راست: جستجو، اسکن و پرداخت -->
+        <div class="col-lg-4 col-12 order-lg-1 order-2">
+            <!-- بارکد و جستجو -->
+            <div class="card card-minimal p-4 mb-4 position-relative">
+                <h6 class="fw-bold mb-3 text-secondary">🔍 افزودن کالا</h6>
+                <div class="mb-3">
+                    <input type="text" id="barcode" class="form-control form-control-minimal form-control-lg text-center" placeholder="[ اسکن بارکد کالا ]">
+                </div>
                 <div class="input-group">
-                    <select id="discount-type" class="form-select" style="max-width:120px;" onchange="updateDiscount()">
-                        <option value="amount" selected>مبلغی</option>
-                        <option value="percent">درصدی</option>
-                        <option value="none">بدون تخفیف</option>
-                    </select>
-                    <input type="number" id="discount-value" class="form-control" value="0" min="0" step="5000" onchange="updateDiscount()">
-                    <span class="input-group-text">تومان</span>
+                    <input type="text" id="search-input" class="form-control form-control-minimal" placeholder="جستجوی نام یا بارکد...">
+                    <button class="btn btn-minimal btn-dark px-3" onclick="searchProducts()">جستجو</button>
                 </div>
+                <ul id="search-results" class="list-group position-absolute start-0 end-0 mx-4 mt-2 card-minimal p-0" style="z-index:1000; display:none; top: 100%;"></ul>
             </div>
-            <div class="col-md-4">
-                <div class="d-flex justify-content-center fs-5">
-                    <span>قابل پرداخت: </span>
-                    <strong id="grand-total" class="text-primary ms-2">0</strong>
-                    <span> تومان</span>
-                </div>
-            </div>
-            <div class="col-md-4 text-end">
-                <button class="btn btn-outline-warning mb-2" onclick="holdOrder()">🛑 نگهداری سبد</button>
-                {% if held_count > 0 %}
-                    <button class="btn btn-outline-info" onclick="showHeldOrders()">📋 سبدهای نگهداری شده <span class="badge bg-danger held-badge">{{ held_count }}</span></button>
-                {% endif %}
-            </div>
-        </div>
-    </div>
 
-    <!-- بخش پرداخت -->
-    <div class="card p-3">
-        <div class="row">
-            <div class="col-md-6">
-                <button class="btn btn-success btn-lg w-100 mb-3" onclick="showPayment()">💳 پرداخت</button>
-            </div>
-            <div class="col-md-6">
-                <div id="payment-section" style="display:none;">
-                    <div class="mb-2">
-                        <label class="form-label">پرداخت نقدی (تومان)</label>
-                        <input type="number" id="cash-amount" class="form-control" value="0" min="0" step="5000" oninput="updateCardAmount()">
+            <!-- بخش پرداخت -->
+            <div class="card card-minimal p-4">
+                <h6 class="fw-bold mb-3 text-secondary">💳 تسویه حساب</h6>
+                <button class="btn btn-minimal btn-success btn-lg w-100 py-3 mb-3 fw-bold shadow-sm" onclick="showPayment()">شروع فرآیند پرداخت</button>
+                
+                <div id="payment-section" style="display:none;" class="pt-2 border-top">
+                    <div class="mb-3">
+                        <label class="form-label text-muted small fw-bold">پرداخت نقدی (تومان)</label>
+                        <input type="number" id="cash-amount" class="form-control form-control-minimal" value="0" min="0" step="5000" oninput="updateCardAmount()">
                     </div>
-                    <div class="mb-2">
-                        <label class="form-label">پرداخت کارتی (تومان)</label>
-                        <input type="number" id="card-amount" class="form-control bg-light" value="0" readonly>
+                    <div class="mb-3">
+                        <label class="form-label text-muted small fw-bold">پرداخت کارتی (تومان)</label>
+                        <input type="number" id="card-amount" class="form-control form-control-minimal text-muted" value="0" readonly>
                     </div>
-                    <div class="d-flex justify-content-between mb-3">
-                        <span>مجموع پرداختی:</span> <strong id="total-paid">0</strong> تومان
+                    <div class="d-flex justify-content-between align-items-center mb-4 p-2 bg-light rounded-3">
+                        <span class="text-muted small">مجموع پرداختی:</span>
+                        <div>
+                            <strong id="total-paid" class="fs-5">0</strong> <span class="small text-muted">تومان</span>
+                        </div>
                     </div>
-                    <div class="d-grid gap-2">
-                        <button class="btn btn-primary" onclick="finalizePayment()">پرداخت نهایی</button>
-                        <button class="btn btn-outline-secondary" onclick="hidePayment()">انصراف</button>
+                    <div class="row g-2">
+                        <div class="col-8">
+                            <button class="btn btn-minimal btn-primary w-100 py-2" onclick="finalizePayment()">ثبت نهایی</button>
+                        </div>
+                        <div class="col-4">
+                            <button class="btn btn-minimal btn-outline-secondary w-100 py-2" onclick="hidePayment()">انصراف</button>
+                        </div>
                     </div>
                 </div>
             </div>
         </div>
+
+        <!-- ستون سمت چپ: سبد خرید (بخش اصلی) -->
+        <div class="col-lg-8 col-12 order-lg-2 order-1">
+            <div class="card card-minimal p-4 mb-4">
+                <div class="d-flex justify-content-between align-items-center mb-4">
+                    <h5 class="fw-bold m-0 text-secondary">🛒 سبد خرید جاری</h5>
+                    <div class="d-flex gap-2">
+                        <button class="btn btn-minimal btn-outline-warning btn-sm" onclick="holdOrder()">🛑 نگهداری سبد</button>
+                        {% if held_count > 0 %}
+                            <button class="btn btn-minimal btn-outline-dark btn-sm position-relative" onclick="showHeldOrders()">
+                                📋 سبدها
+                                <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger">{{ held_count }}</span>
+                            </button>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle" id="cart-table">
+                        <thead>
+                            <tr>
+                                <th>کالا</th>
+                                <th style="width: 160px;">تعداد</th>
+                                <th>فی (تومان)</th>
+                                <th>جمع (تومان)</th>
+                                <th style="width: 50px;"></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <!-- ردیف‌ها به صورت پویا با JS تزریق می‌شوند -->
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- بخش تخفیف و مجموع قیمت -->
+                <div class="row mt-4 pt-3 border-top g-3 align-items-center">
+                    <div class="col-md-6 col-12">
+                        <div class="input-group">
+                            <select id="discount-type" class="form-select form-control-minimal bg-white" style="max-width:110px;" onchange="updateDiscount()">
+                                <option value="amount" selected>مبلغی</option>
+                                <option value="percent">درصدی</option>
+                                <option value="none">بدون تخفیف</option>
+                            </select>
+                            <input type="number" id="discount-value" class="form-control form-control-minimal" value="0" min="0" step="5000" onchange="updateDiscount()">
+                            <span class="input-group-text bg-light border-0 text-muted">تومان</span>
+                        </div>
+                    </div>
+                    <div class="col-md-6 col-12 text-md-end text-center">
+                        <div class="fs-5 fw-bold">
+                            <span class="text-muted fw-normal">قابل پرداخت:</span>
+                            <span id="grand-total" class="text-dark mx-1 fs-3">0</span>
+                            <span class="text-muted fs-6 fw-normal">تومان</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
     </div>
 </div>
 
-<!-- مودال سبدهای نگهداری شده -->
+<!-- مودال سبدها -->
 <div class="modal fade" id="heldModal" tabindex="-1">
-  <div class="modal-dialog modal-lg">
-    <div class="modal-content">
-      <div class="modal-header">
-        <h5>سبدهای نگهداری‌شده</h5>
+  <div class="modal-dialog modal-dialog-centered modal-lg">
+    <div class="modal-content border-0 rounded-4 shadow-lg">
+      <div class="modal-header border-bottom-0 pb-0 pt-4 px-4">
+        <h5 class="fw-bold m-0">سبدهای نگهداری‌شده</h5>
         <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
       </div>
-      <div class="modal-body" id="held-list"></div>
+      <div class="modal-body p-4" id="held-list"></div>
     </div>
   </div>
 </div>
@@ -142,7 +212,6 @@
     const csrftoken = '{{ csrf_token }}';
     let grandTotalToman = 0;
 
-    // فعال‌سازی tooltip‌های بوت‌استرپ در کل صفحه (برای آیتم‌های پویا هم کار می‌کند)
     function enableTooltips() {
         var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'))
         tooltipTriggerList.map(function (tooltipTriggerEl) {
@@ -150,11 +219,9 @@
         })
     }
 
-    // راه‌اندازی اولیه
     enableTooltips();
     document.getElementById('barcode').focus();
 
-    // اسکن بارکد با Enter
     document.getElementById('barcode').addEventListener('keypress', e => {
         if (e.key === 'Enter') {
             const barcode = e.target.value; e.target.value = '';
@@ -162,7 +229,6 @@
         }
     });
 
-    // ---------- جستجوی پیشرفته ----------
     const searchInput = document.getElementById('search-input');
     const searchResults = document.getElementById('search-results');
 
@@ -195,14 +261,14 @@
             .then(data => {
                 searchResults.innerHTML = '';
                 if (data.length === 0) {
-                    searchResults.innerHTML = '<li class="list-group-item text-muted">نتیجه‌ای یافت نشد</li>';
+                    searchResults.innerHTML = '<li class="list-group-item text-muted border-0 p-3">نتیجه‌ای یافت نشد</li>';
                 } else {
                     data.forEach(p => {
                         const li = document.createElement('li');
-                        li.className = 'list-group-item list-group-item-action';
+                        li.className = 'list-group-item list-group-item-action border-0 p-3';
                         li.style.cursor = 'pointer';
                         let costText = p.cost ? `<br><small class="text-muted">قیمت خرید: ${p.cost.toLocaleString()} تومان</small>` : '';
-                        li.innerHTML = `${p.name} (${p.barcode}) - ${p.price.toLocaleString()} تومان${costText}`;
+                        li.innerHTML = `<strong>${p.name}</strong> <span class="text-muted small">(${p.barcode})</span><div class="text-primary small fw-bold mt-1">${p.price.toLocaleString()} تومان${costText}</div>`;
                         li.addEventListener('click', function() {
                             addProduct(null, p.id);
                             searchResults.style.display = 'none';
@@ -216,7 +282,7 @@
             })
             .catch(err => {
                 console.error(err);
-                searchResults.innerHTML = '<li class="list-group-item text-danger">خطا در جستجو</li>';
+                searchResults.innerHTML = '<li class="list-group-item text-danger border-0 p-3">خطا در جستجو</li>';
                 searchResults.style.display = 'block';
             });
     }
@@ -235,31 +301,24 @@
         data.cart.forEach((item, idx) => {
             const unitPrice = item.unit_price;
             const rowTotal = (item.unit_price * item.quantity) + item.tax;
-            // ساخت tooltip برای قیمت خرید
             let tooltipText = item.purchase_cost ? `قیمت خرید: ${item.purchase_cost.toLocaleString()} تومان` : '';
-        tbody.innerHTML += `<tr>
-            <td><span data-bs-toggle="tooltip" title="${tooltipText}">${item.name}</span></td>
-            <td style="white-space:nowrap;">
-                <button class="btn btn-sm btn-outline-secondary quantity-btn" onclick="updateCartItem(${idx}, 'decrease')">➖</button>
-                <input type="number"
-                       value="${item.quantity}"
-                       min="0.001"
-                       step="any"
-                       class="form-control form-control-sm d-inline-block"
-                       style="width:80px; text-align:center;"
-                       onchange="updateQuantityManually(${idx}, this.value)">
-                <button class="btn btn-sm btn-outline-secondary quantity-btn" onclick="updateCartItem(${idx}, 'increase')">➕</button>
-            </td>
-                <td>${unitPrice.toLocaleString()}</td>
-                <td>${rowTotal.toLocaleString()}</td>
-                <td><button class="btn btn-sm btn-danger" onclick="removeItem(${idx})">🗑️</button></td>
+            tbody.innerHTML += `<tr>
+                <td><span class="fw-bold" data-bs-toggle="tooltip" title="${tooltipText}">${item.name}</span></td>
+                <td>
+                    <div class="input-group input-group-sm flex-nowrap" style="max-width: 140px;">
+                        <button class="btn btn-outline-secondary quantity-btn border-1" onclick="updateCartItem(${idx}, 'decrease')">-</button>
+                        <input type="number" value="${item.quantity}" min="0.001" step="any" class="form-control text-center mx-1 border-0 bg-light rounded" onchange="updateQuantityManually(${idx}, this.value)">
+                        <button class="btn btn-outline-secondary quantity-btn border-1" onclick="updateCartItem(${idx}, 'increase')">+</button>
+                    </div>
+                </td>
+                <td class="text-secondary">${unitPrice.toLocaleString()}</td>
+                <td class="fw-bold">${rowTotal.toLocaleString()}</td>
+                <td><button class="btn btn-sm btn-link text-danger p-0" onclick="removeItem(${idx})">حذف</button></td>
             </tr>`;
         });
 
         document.getElementById('grand-total').textContent = data.grand_total.toLocaleString();
         grandTotalToman = data.grand_total;
-
-        // فعال‌سازی tooltip‌ها برای عناصر جدید
         enableTooltips();
     }
 
@@ -348,7 +407,6 @@
         }).then(r => r.json()).then(data => {
             if (data.error) alert(data.error);
             else {
-                alert(data.message);
                 location.reload();
             }
         });
@@ -372,21 +430,17 @@
                     let html = '';
                     data.forEach(o => {
                         html += `
-                        <div class="card held-card mb-3">
-                            <div class="card-body">
-                                <div class="d-flex justify-content-between align-items-center">
-                                    <div>
-                                        <h6 class="mb-1">سفارش #${o.id}</h6>
-                                        <small class="text-muted">${o.held_at}</small>
-                                        <div class="mt-1">
-                                            <span class="badge bg-secondary">${o.items_count} قلم</span>
-                                            <span class="ms-2 fw-bold">${o.grand_total.toLocaleString()} تومان</span>
-                                        </div>
-                                    </div>
-                                    <div>
-                                        <button class="btn btn-sm btn-primary me-1" onclick="resumeHeld(${o.id})">▶ ادامه</button>
-                                        <button class="btn btn-sm btn-outline-danger" onclick="deleteHeld(${o.id})">🗑 حذف</button>
-                                    </div>
+                        <div class="card held-card mb-3 p-3">
+                            <div class="d-flex justify-content-between align-items-center flex-wrap g-2">
+                                <div>
+                                    <h6 class="fw-bold mb-1">سفارش #${o.id}</h6>
+                                    <small class="text-muted d-block mb-2">${o.held_at}</small>
+                                    <span class="badge bg-light text-dark border">${o.items_count} قلم</span>
+                                    <span class="ms-2 fw-bold text-primary">${o.grand_total.toLocaleString()} تومان</span>
+                                </div>
+                                <div class="d-flex gap-2">
+                                    <button class="btn btn-sm btn-minimal btn-primary" onclick="resumeHeld(${o.id})">ادامه</button>
+                                    <button class="btn btn-sm btn-minimal btn-outline-danger" onclick="deleteHeld(${o.id})">حذف</button>
                                 </div>
                             </div>
                         </div>`;
